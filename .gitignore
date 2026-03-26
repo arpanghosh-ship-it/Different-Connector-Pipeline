@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+.venv/
+venv/
+env/
+
+# FastAPI / backend env
+backend/.env
+.env
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.vite/
+
+# Storage / generated data
+storage/
+backend/storage/
+*.sqlite3
+*.db
+chroma_db/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Git
+.gitignore.swp
