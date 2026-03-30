@@ -1,259 +1,139 @@
-# 🚀 Drive Connector Pipeline
+# Google Drive Connector
 
-A full-stack application that connects to Google Drive, recursively crawls folders, normalizes files, and maintains a continuously updating dataset with real-time activity tracking.
+A highly resilient, modular monolith ingestion service built with FastAPI. This connector fetches files from Google Drive and transforms them into a standardized, source-agnostic `NormalizedDocument` schema, making it ideal for feeding downstream chunking pipelines, RAG chatbots, and vector databases.
 
----
+## 🌟 Core Architecture
 
-## 📌 Overview
+The connector is designed around a **7-Layer Normalize Adapter** pattern. A failure in any layer produces a deterministic, storable outcome rather than a crash, ensuring the pipeline remains resilient and retryable.
 
-This project allows you to:
+1. **OAuth Token Check:** Proactively verifies and refreshes tokens before they expire.
+2. **Drive Type Router:** Automatically handles API parameter adjustments for My Drive vs. Shared Drives.
+3. **Folder Access & Path Cache:** Resolves full file paths locally to avoid expensive recursive API calls.
+4. **Metadata Fetch:** Pulls all necessary non-content fields using optimized field masks.
+5. **Content Fetch:** Routes Google-native formats (Docs, Sheets) to `.export()` and binary files to `.get(alt=media)`.
+6. **Error Classifier:** Deterministically classifies API responses (200 Accessible, 403 Inaccessible, 404 Deleted).
+7. **Normalize Adapter:** Maps the data into the universal `NormalizedDocument` schema and persists it.
 
-* Authenticate with Google Drive
-* Select a folder to crawl
-* Recursively scan all nested files and folders
-* Normalize file metadata (type, size, extension, etc.)
-* Store processed files locally
-* Continuously monitor updates using polling (every 30 seconds)
-* View real-time updates via Server-Sent Events (SSE)
+## 📁 Project Structure
 
----
-
-## 🏗️ Project Structure
-
-```
-Different-Connector-Pipeline/
-│
-├── backend/
-│   ├── main.py              # FastAPI app (APIs + SSE)
-│   ├── auth.py              # Google OAuth logic
-│   ├── crawler.py           # Recursive Drive crawler
-│   ├── poller.py            # Polling scheduler (30 sec)
-│   ├── normalizer.py        # File normalization logic
-│   ├── storage.py           # Local file storage
-│   ├── events.py            # SSE event system
-│   ├── duplicate_check.py   # Duplicate tracking
-│   ├── config.py            # Configurations
-│   ├── requirements.txt     # Backend dependencies
-│   └── .env.example         # Environment variables template
-│
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── components/
-│   │   │   ├── LoginPage.jsx
-│   │   │   ├── FolderPicker.jsx
-│   │   │   ├── Dashboard.jsx
-│   │   ├── index.css
-│   │   └── main.jsx
-│   │
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js
-│
-├── storage/                 # Ignored (generated files)
-├── README.md
-└── .gitignore
+```text
+backend/
+├── main.py                 # FastAPI application and SSE event stream
+├── requirements.txt        # Python dependencies
+├── config/
+│   └── settings.py         # Environment variables and constants
+├── auth/
+│   ├── router.py           # OAuth2 login, callback, and user info routes
+│   ├── flow.py             # Google Auth flow configuration
+│   ├── credentials.py      # Token storage and proactive refresh logic
+│   └── state_store.py      # OAuth state validation
+├── sync/
+│   ├── crawler.py          # Recursive folder crawling and file processing
+│   ├── drive_client.py     # HTTPX client for Google Drive API interactions
+│   └── poller.py           # APScheduler background sync jobs
+├── normalize/
+│   ├── document.py         # NormalizedDocument schema builder
+│   ├── mime.py             # MIME type detection and Google Workspace export mapping
+│   └── formatters.py       # Human-readable byte formatting
+├── storage/
+│   ├── file_store.py       # Local persistence for raw files and normalized JSON
+│   ├── visited.py          # Duplicate tracking via source_id
+│   └── root_folder.py      # State management for the current sync target
+└── events/
+    └── bus.py              # Async queue for real-time Server-Sent Events (SSE)
 ```
 
----
+## 🚀 Getting Started
 
-## ⚙️ Features
+### Prerequisites
 
-### 🔐 Authentication
+- Python 3.12+
+- A Google Cloud Project with the Google Drive API enabled.
+- OAuth 2.0 Client IDs configured in your Google Cloud Console.
 
-* Google OAuth 2.0 login
-* Secure token handling
+### 1. Environment Setup
 
-### 📂 Folder Crawling
+Create a `.env` file in the root `backend/` directory:
 
-* Recursive traversal of nested folders
-* Handles Google native files (Docs, Sheets, etc.)
-
-### 🔄 Polling System
-
-* Runs every **30 seconds**
-* Detects new or updated files
-* Can be **paused/resumed**
-
-### 📡 Real-Time Updates
-
-* Server-Sent Events (SSE)
-* Live activity feed in frontend
-
-### 📊 File Normalization
-
-Each file includes:
-
-* File name
-* File type (pdf, csv, gdoc, etc.)
-* File extension
-* Size (KB / MB / GB)
-* Owner email
-* Path
-* Last modified time
-
----
-
-## 🧠 Tech Stack
-
-### Backend
-
-* FastAPI
-* AsyncIO
-* APScheduler
-* Google Drive API
-
-### Frontend
-
-* React (Vite)
-* Fetch API
-* SSE (EventSource)
-
----
-
-## 🔑 Environment Setup
-
-### 1. Backend `.env`
-
-Create file:
-
-```
-backend/.env
-```
-
-Add:
-
-```
-GOOGLE_CLIENT_ID=your_client_id
-GOOGLE_CLIENT_SECRET=your_client_secret
-REDIRECT_URI=http://localhost:8000/auth/callback
+```env
+GOOGLE_CLIENT_ID=your_google_client_id_here
+GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+GOOGLE_REDIRECT_URI=http://localhost:8000/auth/callback
 FRONTEND_URL=http://localhost:5173
+STORAGE_DIR=./storage
+MAX_FILE_SIZE_MB=50
+POLL_INTERVAL_SECONDS=30
 ```
 
----
-
-## ▶️ Running the Project
-
----
-
-### 🔧 Backend Setup
+### 2. Install Dependencies
 
 ```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-
-# Activate
-# Windows
-venv\Scripts\activate
-
-# Mac/Linux
-source venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
+```
 
-# Run server
+### 3. Run the Server
+
+```bash
 uvicorn main:app --reload --port 8000
 ```
 
-Backend runs on:
+## 📡 API Reference
 
+### Authentication
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/auth/login` | Initiates the Google OAuth2 flow. |
+| `GET` | `/auth/callback` | Handles the OAuth callback and exchanges the code for tokens. |
+| `GET` | `/auth/me` | Returns the authenticated user's profile information. |
+| `GET` | `/auth/logout` | Clears local credentials. |
+
+### Crawling & Sync
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/start-crawl` | Triggers a recursive sync of a specific Drive folder. Body: `{"folder_id": "string", "folder_name": "string"}` |
+| `GET` | `/api/status` | Returns current auth status, active root folder, and total files stored. |
+| `GET` | `/api/folders?parent_id=root` | Lists subfolders for a given parent ID. |
+| `GET` | `/api/files` | Returns a consolidated list of all successfully normalized files in local storage. |
+
+### Background Poller
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/start-poll` | Resumes the background scheduler (runs every 30s). |
+| `POST` | `/api/stop-poll` | Pauses the background scheduler. |
+
+### Real-time Events
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/events` | An SSE endpoint that streams real-time updates about the crawler's progress (e.g., `scan_start`, `file_found`, `stored`, `skipped`, `error`). |
+
+## 📄 Output Schema (`NormalizedDocument`)
+
+Every file successfully processed by the connector will be saved alongside its raw binary/text counterpart as a `normalized.json` file. This schema acts as a universal contract for your downstream AI ingestion pipelines.
+
+```json
+{
+  "source_id": "1A2B3C4D5E...",
+  "source_type": "drive",
+  "file_name": "Q1 Architecture Roadmap",
+  "mime_type": "application/vnd.google-apps.document",
+  "export_mime_type": "text/plain",
+  "file_extension": ".txt",
+  "file_type": "gdoc",
+  "size_bytes": 10245,
+  "size_human": "10.0 KB",
+  "path": "/Engineering/Q1 Architecture Roadmap",
+  "parent_folder_id": "xyz123...",
+  "owner_email": "engineer@intglobal.com",
+  "web_url": "https://docs.google.com/document/d/...",
+  "shared": true,
+  "modified_at": "2026-03-31T10:00:00.000Z",
+  "content_status": "accessible",
+  "raw_file_path": "./storage/1/raw.txt",
+  "folder_number": 1,
+  "connector_synced_at": "2026-03-31T14:30:00.000Z"
+}
 ```
-http://localhost:8000
-```
-
----
-
-### 💻 Frontend Setup
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run frontend
-npm run dev
-```
-
-Frontend runs on:
-
-```
-http://localhost:5173
-```
-
----
-
-## 🔄 Application Flow
-
-1. Open frontend
-2. Login using Google
-3. Select a folder
-4. Start crawling
-5. View files and activity updates
-6. Polling runs every 30 seconds
-7. New files automatically appear
-
----
-
-## 🧪 API Endpoints
-
-| Method | Endpoint           | Description        |
-| ------ | ------------------ | ------------------ |
-| GET    | `/api/health`      | Health check       |
-| GET    | `/api/status`      | App status         |
-| GET    | `/api/folders`     | List Drive folders |
-| POST   | `/api/start-crawl` | Start crawling     |
-| GET    | `/api/files`       | Get stored files   |
-| POST   | `/api/start-poll`  | Resume polling     |
-| POST   | `/api/stop-poll`   | Pause polling      |
-| GET    | `/api/events`      | SSE stream         |
-
----
-
-## ⚠️ Notes
-
-* `storage/` folder is ignored in Git
-* `.env` file should never be committed
-* Ensure Google OAuth redirect URI matches backend
-
----
-
-## 🤝 Collaboration Workflow
-
-* `main` branch → stable production code
-* Each developer works in separate branch:
-
-  ```
-  git checkout -b username/feature-name
-  ```
-* Push branch:
-
-  ```
-  git push -u origin username/feature-name
-  ```
-* Create Pull Request → Merge after testing
-
----
-
-## 🛠️ Future Improvements
-
-* Search and filter files
-* Pagination for large datasets
-* File preview support
-* Multi-user support
-* Cloud storage integration (S3, GCS)
-
----
-
-## 📄 License
-
-This project is for learning and development purposes.
-
----
-
-## 👨‍💻 Author
-
-**Arpan Ghosh**
