@@ -5,6 +5,8 @@ from config import VISITED_FILE, STORAGE_DIR
 
 _lock = asyncio.Lock()
 
+# Define the new file path for storing content hashes
+CONTENT_HASHES_FILE = os.path.join(STORAGE_DIR, 'content_hashes.json')
 
 def _load() -> dict:
     os.makedirs(STORAGE_DIR, exist_ok=True)
@@ -42,3 +44,43 @@ def get_all_visited() -> dict:
 
 def total_visited() -> int:
     return len(_load())
+
+
+# --- NEW CONTENT HASHING LOGIC ---
+
+def _load_hashes() -> dict:
+    if not os.path.exists(CONTENT_HASHES_FILE):
+        return {}
+    try:
+        with open(CONTENT_HASHES_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_hashes(data: dict):
+    with open(CONTENT_HASHES_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
+
+
+def is_content_seen(content_hash: str) -> bool:
+    """Checks if a file with this exact content hash has already been stored."""
+    if not content_hash: 
+        return False
+    return content_hash in _load_hashes()
+
+
+def mark_content_seen(content_hash: str, original_folder_number: int):
+    """Saves the hash pointing to the original folder number to prevent future duplicates."""
+    if not content_hash:
+        return
+    hashes = _load_hashes()
+    hashes[content_hash] = {
+        'folder_number': original_folder_number
+    }
+    _save_hashes(hashes)
+
+
+def get_original_folder(content_hash: str) -> int:
+    """Retrieves the folder number where the original identical content is stored."""
+    return _load_hashes().get(content_hash, {}).get('folder_number')

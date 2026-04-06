@@ -11,11 +11,7 @@ async function fetchJSON(url, options) {
 
 function formatTime(value) {
   if (!value) return '—'
-  try {
-    return new Date(value).toLocaleString()
-  } catch {
-    return value
-  }
+  try { return new Date(value).toLocaleString() } catch { return value }
 }
 
 function formatSize(bytes) {
@@ -34,66 +30,70 @@ function getMimeBadge(file) {
 
 function getFileIcon(file) {
   const label = `${file.mime_type || ''} ${file.file_extension || ''} ${file.file_type || ''}`.toLowerCase()
-  if (label.includes('folder')) return '📁'
-  if (label.includes('pdf')) return '📄'
+  if (label.includes('folder'))  return '📁'
+  if (label.includes('pdf'))     return '📄'
   if (label.includes('sheet') || label.includes('csv') || label.includes('xlsx') || label.includes('spread')) return '📊'
-  if (label.includes('doc') || label.includes('txt')) return '📝'
-  if (label.includes('slide') || label.includes('ppt')) return '📽️'
-  if (label.includes('image') || label.includes('png') || label.includes('jpg') || label.includes('jpeg')) return '🖼️'
-  if (label.includes('video') || label.includes('mp4') || label.includes('mov')) return '🎞️'
+  if (label.includes('doc') || label.includes('txt'))  return '📝'
+  if (label.includes('slide') || label.includes('ppt')) return '📽'
+  if (label.includes('image') || label.includes('png') || label.includes('jpg') || label.includes('jpeg'))   return '🖼'
+  if (label.includes('video') || label.includes('mp4') || label.includes('mov')) return '🎞'
   if (label.includes('audio') || label.includes('mp3') || label.includes('wav')) return '🎵'
   return '📄'
 }
 
 function statusTone(status) {
   switch (status) {
-    case 'accessible': return 'badge-green'
+    case 'accessible':   return 'badge-green'
     case 'inaccessible': return 'badge-orange'
-    case 'too_large': return 'badge-yellow'
-    case 'deleted': return 'badge-red'
-    case 'error': return 'badge-red'
-    default: return 'badge-muted'
+    case 'too_large':    return 'badge-yellow'
+    case 'deleted':      return 'badge-red'
+    case 'error':        return 'badge-red'
+    default:             return 'badge-muted'
   }
 }
 
 function eventTone(type) {
-  if (type === 'error') return 'feed-item--error'
-  if (type === 'stored') return 'feed-item--stored'
+  if (type === 'error')            return 'feed-item--error'
+  if (type === 'stored')           return 'feed-item--stored'
+  if (type === 'webhook_received') return 'feed-item--webhook'
   return ''
 }
 
 function eventIcon(type) {
   switch (type) {
-    case 'crawl_start': return '🧭'
-    case 'scan_start': return '📂'
-    case 'file_found': return '🔎'
-    case 'processing': return '⏳'
-    case 'stored': return '✅'
-    case 'skipped': return '↷'
-    case 'poll_start': return '⏱️'
-    case 'poll_complete': return '↻'
-    case 'poll_skip': return '⏭️'
-    case 'crawl_complete': return '🏁'
-    case 'error': return '⛔'
-    default: return '•'
+    case 'crawl_start':     return '🧭'
+    case 'scan_start':      return '📂'
+    case 'file_found':      return '🔎'
+    case 'processing':      return '⏳'
+    case 'stored':          return '✅'
+    case 'skipped':         return '↷'
+    case 'crawl_complete':  return '🏁'
+    case 'error':           return '⛔'
+    case 'webhook_received': return '📡'
+    case 'webhook_stopped': return '🔌'
+    case 'webhook_renewing': return '🔄'
+    case 'webhook_renewed': return '🔒'
+    default:                return '•'
   }
 }
 
 function eventColor(type) {
   switch (type) {
     case 'crawl_start':
-    case 'scan_start': return 'badge-cyan'
-    case 'file_found': return 'badge-yellow'
-    case 'processing': return 'badge-orange'
-    case 'stored': return 'badge-green'
-    case 'skipped': return 'badge-muted'
-    case 'poll_start':
-    case 'poll_complete': return 'badge-purple'
-    case 'error': return 'badge-red'
-    default: return 'badge-muted'
+    case 'scan_start':       return 'badge-cyan'
+    case 'file_found':       return 'badge-yellow'
+    case 'processing':       return 'badge-orange'
+    case 'stored':           return 'badge-green'
+    case 'skipped':          return 'badge-muted'
+    case 'webhook_received':
+    case 'webhook_renewed':  return 'badge-purple'
+    case 'webhook_renewing': return 'badge-yellow'
+    case 'error':            return 'badge-red'
+    default:                 return 'badge-muted'
   }
 }
 
+// ── Activity Feed ──────────────────────────────────────────────────────────────
 function ActivityFeed({ events, onClear }) {
   const bottomRef = useRef(null)
 
@@ -126,13 +126,20 @@ function ActivityFeed({ events, onClear }) {
         ) : (
           <div>
             {events.map((event, index) => (
-              <div key={`${event.type}-${index}-${event.timestamp || ''}`} className={`feed-item ${eventTone(event.type)}`}>
+              <div
+                key={`${event.type}-${index}-${event.timestamp || ''}`}
+                className={`feed-item ${eventTone(event.type)}`}
+              >
                 <div className={`feed-item__icon ${eventColor(event.type)}`}>
-                  {event.type === 'processing' ? <span className="spinner" style={{ width: 12, height: 12 }} /> : eventIcon(event.type)}
+                  {event.type === 'processing'
+                    ? <span className="spinner" style={{ width: 12, height: 12 }} />
+                    : eventIcon(event.type)}
                 </div>
                 <div className="feed-item__content">
                   <div className="feed-item__label">{event.type.replace(/_/g, ' ')}</div>
-                  <div className="feed-item__path">{event.path || event.file_name || event.message || '—'}</div>
+                  <div className="feed-item__path">
+                    {event.message || event.path || event.file_name || '—'}
+                  </div>
                 </div>
                 <div className="feed-item__time">{formatTime(event.timestamp)}</div>
               </div>
@@ -145,6 +152,7 @@ function ActivityFeed({ events, onClear }) {
   )
 }
 
+// ── Detail row ─────────────────────────────────────────────────────────────────
 function DetailItem({ label, value }) {
   return (
     <div>
@@ -154,22 +162,49 @@ function DetailItem({ label, value }) {
   )
 }
 
-export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }) {
-  const [files, setFiles] = useState([])
-  const [events, setEvents] = useState([])
-  const [loadingFiles, setLoadingFiles] = useState(true)
-  const [pollingEnabled, setPollingEnabled] = useState(true)
-  const [isCrawling, setIsCrawling] = useState(false)
-  const [secondsLeft, setSecondsLeft] = useState(30)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [sortKey, setSortKey] = useState('folder_number')
-  const [expanded, setExpanded] = useState({})
-  const [now, setNow] = useState(Date.now())
+// ── Webhook status badge ───────────────────────────────────────────────────────
+function WebhookBadge({ webhook }) {
+  if (!webhook) return null
 
-  const eventSourceRef = useRef(null)
+  if (!webhook.active) {
+    return (
+      <span
+        className="badge badge-red"
+        title="Webhook inactive — add WEBHOOK_URL to .env (use ngrok for local dev)"
+      >
+        📡 Webhook inactive
+      </span>
+    )
+  }
+
+  const expiry = webhook.expires_at
+    ? `Expires ${new Date(webhook.expires_at).toLocaleDateString()}`
+    : ''
+
+  return (
+    <span className="badge badge-purple" title={expiry}>
+      📡 Webhook live
+    </span>
+  )
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────────
+export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }) {
+  const [files, setFiles]               = useState([])
+  const [events, setEvents]             = useState([])
+  const [loadingFiles, setLoadingFiles] = useState(true)
+  const [isCrawling, setIsCrawling]     = useState(false)
+  const [search, setSearch]             = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortKey, setSortKey]           = useState('folder_number')
+  const [expanded, setExpanded]         = useState({})
+  const [now, setNow]                   = useState(Date.now())
+  const [webhook, setWebhook]           = useState(null)
+  const [reregistering, setReregistering] = useState(false)
+
+  const eventSourceRef   = useRef(null)
   const reconnectTimerRef = useRef(null)
-  const aliveRef = useRef(true)
+  const aliveRef         = useRef(true)
 
   useEffect(() => {
     void bootstrap()
@@ -186,19 +221,10 @@ export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }
     return () => clearInterval(t)
   }, [])
 
-  useEffect(() => {
-    if (!pollingEnabled) return
-    const t = setInterval(() => {
-      setSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0))
-    }, 1000)
-    return () => clearInterval(t)
-  }, [pollingEnabled])
-
   async function bootstrap() {
     try {
       const status = await fetchJSON('/api/status')
-      setPollingEnabled(!!status.polling)
-      setSecondsLeft(status.polling ? 30 : 0)
+      setWebhook(status.webhook || null)
       await loadFiles(false)
       connectSSE()
     } catch {
@@ -230,15 +256,13 @@ export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }
         map.set(item.source_id, { ...item, __addedAt: markNew ? Date.now() : 0 })
       }
     }
-
     const merged = Array.from(map.values())
     merged.sort((a, b) => {
-      const left = Number(a.folder_number || 0)
-      const right = Number(b.folder_number || 0)
-      if (left !== right) return left - right
+      const l = Number(a.folder_number || 0)
+      const r = Number(b.folder_number || 0)
+      if (l !== r) return l - r
       return String(a.file_name || '').localeCompare(String(b.file_name || ''))
     })
-
     return merged
   }
 
@@ -249,38 +273,26 @@ export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }
 
   function connectSSE() {
     if (eventSourceRef.current) return
-
     const source = new EventSource('/api/events')
     eventSourceRef.current = source
 
     source.onmessage = (message) => {
       let event
-      try {
-        event = JSON.parse(message.data)
-      } catch {
-        return
-      }
+      try { event = JSON.parse(message.data) } catch { return }
       if (event.type === 'ping') return
 
       pushEvent(event)
 
-      if (event.type === 'crawl_start' || event.type === 'poll_start') {
+      if (event.type === 'crawl_start' || event.type === 'webhook_received') {
         setIsCrawling(true)
-        setSecondsLeft(30)
       }
-      if (event.type === 'poll_skip') {
+      if (event.type === 'crawl_complete' || event.type === 'error') {
         setIsCrawling(false)
-      }
-      if (event.type === 'stored') {
-        setPollingEnabled(true)
-      }
-      if (event.type === 'crawl_complete' || event.type === 'poll_complete') {
-        setIsCrawling(false)
-        setSecondsLeft(30)
         void loadFiles(true)
       }
-      if (event.type === 'error') {
-        setIsCrawling(false)
+      if (event.type === 'webhook_renewed') {
+        // Refresh webhook status from server
+        fetchJSON('/api/webhook/status').then(setWebhook).catch(() => {})
       }
     }
 
@@ -294,41 +306,34 @@ export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }
     }
   }
 
-  async function handleStopPolling() {
-    await fetchJSON('/api/stop-poll', { method: 'POST' })
-    setPollingEnabled(false)
-    setSecondsLeft(0)
-  }
-
-  async function handleStartPolling() {
-    await fetchJSON('/api/start-poll', { method: 'POST' })
-    setPollingEnabled(true)
-    setSecondsLeft(30)
+  async function handleReregisterWebhook() {
+    setReregistering(true)
+    try {
+      const result = await fetchJSON('/api/webhook/register', { method: 'POST' })
+      setWebhook({ active: result.success, ...result })
+      pushEvent({ type: 'webhook_renewed', message: `Webhook registered: ${result.callback_url}` })
+    } catch (err) {
+      pushEvent({ type: 'error', message: `Webhook registration failed: ${err.message}` })
+    } finally {
+      setReregistering(false)
+    }
   }
 
   const visibleFiles = useMemo(() => {
     const q = search.trim().toLowerCase()
     const filtered = files.filter((file) => {
-      const matchesText = !q || `${file.file_name || ''} ${file.path || ''}`.toLowerCase().includes(q)
+      const matchesText   = !q || `${file.file_name || ''} ${file.path || ''}`.toLowerCase().includes(q)
       const matchesStatus = statusFilter === 'all' || file.content_status === statusFilter
       return matchesText && matchesStatus
     })
-
     filtered.sort((a, b) => {
-      if (sortKey === 'folder_number') {
-        return Number(a.folder_number || 0) - Number(b.folder_number || 0)
-      }
-      if (sortKey === 'name') {
-        return String(a.file_name || '').localeCompare(String(b.file_name || ''))
-      }
+      if (sortKey === 'folder_number') return Number(a.folder_number || 0) - Number(b.folder_number || 0)
+      if (sortKey === 'name')         return String(a.file_name || '').localeCompare(String(b.file_name || ''))
       if (sortKey === 'modified_at') {
-        const left = new Date(a.modified_at || 0).getTime()
-        const right = new Date(b.modified_at || 0).getTime()
-        return left - right
+        return new Date(a.modified_at || 0).getTime() - new Date(b.modified_at || 0).getTime()
       }
       return 0
     })
-
     return filtered
   }, [files, search, statusFilter, sortKey])
 
@@ -340,6 +345,7 @@ export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }
 
   return (
     <div className="layout-grid">
+      {/* ── Navbar ── */}
       <header className="navbar">
         <div className="navbar__left">
           <div className="brand">
@@ -350,16 +356,28 @@ export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }
         </div>
 
         <div className="navbar__center" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
+          {/* Sync status */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className={`pulse-dot ${isCrawling ? 'pulse-dot--orange' : 'pulse-dot--green'}`} />
-            <span className="mono muted">{isCrawling ? 'syncing' : 'idle'}</span>
+            <span className="mono muted">{isCrawling ? 'syncing…' : 'idle'}</span>
           </div>
+
           <span className="badge badge-muted">{fileCount} files stored</span>
-          <span className="badge badge-purple">Next poll in {pollingEnabled ? secondsLeft : 'paused'}</span>
-          {pollingEnabled ? (
-            <button className="btn btn-danger" type="button" onClick={handleStopPolling}>⏹ Stop Polling</button>
-          ) : (
-            <button className="btn btn-success" type="button" onClick={handleStartPolling}>▶ Start Polling</button>
+
+          {/* Webhook live status */}
+          <WebhookBadge webhook={webhook} />
+
+          {/* Re-register button — shown when webhook is inactive or missing */}
+          {(!webhook?.active) && (
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={handleReregisterWebhook}
+              disabled={reregistering}
+              title="Register webhook (requires WEBHOOK_URL in .env)"
+            >
+              {reregistering ? 'Registering…' : '🔗 Register Webhook'}
+            </button>
           )}
         </div>
 
@@ -382,6 +400,7 @@ export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }
         </div>
       </header>
 
+      {/* ── Body grid ── */}
       <div className="content-grid">
         <aside className="sidebar">
           <ActivityFeed events={events} onClear={() => setEvents([])} />
@@ -399,7 +418,12 @@ export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }
               </div>
 
               <div className="files-toolbar" style={{ width: '100%' }}>
-                <input className="input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by file name or path…" />
+                <input
+                  className="input"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by file name or path…"
+                />
                 <select className="select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                   <option value="all">All statuses</option>
                   <option value="accessible">Accessible</option>
@@ -435,7 +459,7 @@ export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }
                       <td colSpan={6} style={{ padding: 28 }}>
                         <div className="feed-empty" style={{ minHeight: 220 }}>
                           <div>
-                            <div className="feed-empty__icon">🗂️</div>
+                            <div className="feed-empty__icon">🗂</div>
                             <div>{loadingFiles ? 'Loading synced files…' : 'No synced files yet'}</div>
                           </div>
                         </div>
@@ -444,9 +468,13 @@ export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }
                   ) : visibleFiles.map((file) => {
                     const expandedRow = !!expanded[file.source_id]
                     const isNew = file.__addedAt && now - file.__addedAt < 5000
+
                     return (
                       <Fragment key={file.source_id}>
-                        <tr className={`file-row ${expandedRow ? 'file-row--expanded' : ''} ${isNew ? 'fade-in-up' : ''}`} onClick={() => toggleExpanded(file.source_id)}>
+                        <tr
+                          className={`file-row ${expandedRow ? 'file-row--expanded' : ''} ${isNew ? 'fade-in-up' : ''}`}
+                          onClick={() => toggleExpanded(file.source_id)}
+                        >
                           <td><div className="file-icon">{getFileIcon(file)}</div></td>
                           <td>
                             <div className="file-name">{file.file_name}</div>
@@ -460,23 +488,24 @@ export default function Dashboard({ user, rootFolder, onChangeFolder, onLogout }
                           <td><span className={`badge ${statusTone(file.content_status)}`}>{file.content_status || '—'}</span></td>
                           <td className="mono">#{file.folder_number ?? '—'}</td>
                         </tr>
+
                         {expandedRow ? (
                           <tr className="expand-row">
                             <td colSpan={6} className="expand-cell">
                               <div className="detail-grid">
-                                <DetailItem label="source_id" value={file.source_id} />
-                                <DetailItem label="source_type" value={file.source_type} />
-                                <DetailItem label="owner_email" value={file.owner_email} />
-                                <DetailItem label="modified_at" value={formatTime(file.modified_at)} />
+                                <DetailItem label="source_id"           value={file.source_id} />
+                                <DetailItem label="source_type"         value={file.source_type} />
+                                <DetailItem label="owner_email"         value={file.owner_email} />
+                                <DetailItem label="modified_at"         value={formatTime(file.modified_at)} />
                                 <DetailItem label="connector_synced_at" value={formatTime(file.connector_synced_at)} />
-                                <DetailItem label="shared" value={String(!!file.shared)} />
-                                <DetailItem label="export_mime_type" value={file.export_mime_type || '—'} />
-                                <DetailItem label="raw_file_path" value={file.raw_file_path || '—'} />
-                                <DetailItem label="file_extension" value={file.file_extension || '—'} />
-                                <DetailItem label="file_type" value={file.file_type || '—'} />
-                                <DetailItem label="size_human" value={file.size_human || '—'} />
-                                <DetailItem label="parent_folder_id" value={file.parent_folder_id || '—'} />
-                                <DetailItem label="web_url" value={file.web_url || '—'} />
+                                <DetailItem label="shared"              value={String(!!file.shared)} />
+                                <DetailItem label="export_mime_type"    value={file.export_mime_type || '—'} />
+                                <DetailItem label="raw_file_path"       value={file.raw_file_path || '—'} />
+                                <DetailItem label="file_extension"      value={file.file_extension || '—'} />
+                                <DetailItem label="file_type"           value={file.file_type || '—'} />
+                                <DetailItem label="size_human"          value={file.size_human || '—'} />
+                                <DetailItem label="parent_folder_id"    value={file.parent_folder_id || '—'} />
+                                <DetailItem label="web_url"             value={file.web_url || '—'} />
                               </div>
                             </td>
                           </tr>

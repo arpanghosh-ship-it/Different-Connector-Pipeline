@@ -2,10 +2,13 @@ import asyncio
 import httpx
 import json
 import os
+import hashlib  # <-- NEW: Required for generating content hashes
 from auth import load_credentials
 from normalizer import build_normalized_document, is_google_native, get_export_mime
 from storage import save_file_pair
-from duplicate_check import is_visited, mark_visited
+
+# <-- UPDATED: Added new content-checking functions
+from duplicate_check import is_visited, mark_visited, is_content_seen, mark_content_seen, get_original_folder 
 from events import broadcast
 from config import MAX_FILE_SIZE_BYTES, STORAGE_DIR, ROOT_FOLDER_FILE
 
@@ -96,6 +99,7 @@ async def _fetch_content(file: dict, token: str) -> tuple[bytes, str]:
 async def _process_file(file: dict, full_path: str, token: str):
     source_id = file['id']
 
+    # 1. Check if we've seen this exact Drive File ID before
     if is_visited(source_id):
         await broadcast({'type': 'skipped', 'path': full_path, 'file_name': file['name']})
         return
@@ -110,27 +114,57 @@ async def _process_file(file: dict, full_path: str, token: str):
     try:
         raw_bytes, raw_mime = await _fetch_content(file, token)
         content_status = 'accessible'
+        
+        # --- NEW HASHING LOGIC START ---
+        if raw_bytes:
+            content_hash = hashlib.sha256(raw_bytes).hexdigest()
+            
+            if is_content_seen(content_hash):
+                # We already have a file with this exact content
+                await broadcast({
+                    'type': 'skipped', 
+                    'path': full_path, 
+                    'file_name': file['name'], 
+                    'reason': 'Duplicate content'
+                })
+                
+                # Still mark this Drive ID as visited, pointing to the original folder
+                original_folder = get_original_folder(content_hash)
+                mark_visited(source_id, original_folder, file['name'], full_path)
+                return
+        else:
+            content_hash = None
+        # --- NEW HASHING LOGIC END ---
+
     except ValueError:
         raw_bytes = b''
         raw_mime = 'application/octet-stream'
         content_status = 'too_large'
+        content_hash = None
     except PermissionError:
         raw_bytes = b''
         raw_mime = 'application/octet-stream'
         content_status = 'inaccessible'
+        content_hash = None
     except FileNotFoundError:
         raw_bytes = b''
         raw_mime = 'application/octet-stream'
         content_status = 'deleted'
+        content_hash = None
     except Exception:
         raw_bytes = b''
         raw_mime = 'application/octet-stream'
         content_status = 'error'
+        content_hash = None
 
     normalized = build_normalized_document(file, full_path, content_status, owner_email)
 
     folder_number = await save_file_pair(source_id, normalized, raw_bytes, raw_mime)
+    
+    # --- UPDATED: Mark both the ID and the Hash as visited ---
     mark_visited(source_id, folder_number, file['name'], full_path)
+    if content_hash:
+        mark_content_seen(content_hash, folder_number)
 
     await broadcast({
         'type': 'stored',
