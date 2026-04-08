@@ -100,7 +100,7 @@ async def _process_file(file: dict, full_path: str, token: str):
     source_id = file['id']
 
     # 1. Check if we've seen this exact Drive File ID before
-    if is_visited(source_id):
+    if await is_visited(source_id):
         await broadcast({'type': 'skipped', 'path': full_path, 'file_name': file['name']})
         return
 
@@ -119,7 +119,7 @@ async def _process_file(file: dict, full_path: str, token: str):
         if raw_bytes:
             content_hash = hashlib.sha256(raw_bytes).hexdigest()
             
-            if is_content_seen(content_hash):
+            if await is_content_seen(content_hash):
                 # We already have a file with this exact content
                 await broadcast({
                     'type': 'skipped', 
@@ -129,8 +129,8 @@ async def _process_file(file: dict, full_path: str, token: str):
                 })
                 
                 # Still mark this Drive ID as visited, pointing to the original folder
-                original_folder = get_original_folder(content_hash)
-                mark_visited(source_id, original_folder, file['name'], full_path)
+                original_folder = await get_original_folder(content_hash)
+                await mark_visited(source_id, original_folder, file['name'], full_path)
                 return
         else:
             content_hash = None
@@ -162,9 +162,9 @@ async def _process_file(file: dict, full_path: str, token: str):
     folder_number = await save_file_pair(source_id, normalized, raw_bytes, raw_mime)
     
     # --- UPDATED: Mark both the ID and the Hash as visited ---
-    mark_visited(source_id, folder_number, file['name'], full_path)
+    await mark_visited(source_id, folder_number, file['name'], full_path)
     if content_hash:
-        mark_content_seen(content_hash, folder_number)
+        await mark_content_seen(content_hash, folder_number)
 
     await broadcast({
         'type': 'stored',

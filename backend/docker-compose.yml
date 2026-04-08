@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  drive-connector:
+    build: .
+    container_name: drive-backend
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    volumes:
+      # This maps the local ./storage folder to /app/storage inside the container
+      # This ensures your downloaded files and credentials persist across restarts
+      - ./storage:/app/storage
+    env_file:
+      - .env

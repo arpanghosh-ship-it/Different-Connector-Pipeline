@@ -57,14 +57,14 @@ def health():
 
 
 @app.get('/api/status')
-def status():
+async def status():
     root = get_root_folder()
     wh = webhook_status()
     return {
         'authenticated': load_credentials() is not None,
         'root_folder': root,
         'webhook': wh,
-        'total_files_stored': total_visited(),
+        'total_files_stored': await total_visited(),
     }
 
 

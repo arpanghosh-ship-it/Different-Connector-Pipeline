@@ -1,20 +1,19 @@
 # 🚀 Drive Connector Pipeline
 
-A full-stack application that connects to Google Drive, recursively crawls folders, normalizes files, and maintains a continuously updating dataset with real-time activity tracking.
+A high-performance, full-stack application that connects to Google Drive, recursively crawls folders, normalizes data, and maintains a real-time synchronized dataset using Google Push Notifications (Webhooks) and Byte-level Deduplication.
 
 ---
 
 ## 📌 Overview
 
-This project allows you to:
+This project provides a complete pipeline for ingesting and monitoring Google Drive content:
 
-* Authenticate with Google Drive
-* Select a folder to crawl
-* Recursively scan all nested files and folders
-* Normalize file metadata (type, size, extension, etc.)
-* Store processed files locally
-* Continuously monitor updates using polling (every 30 seconds)
-* View real-time updates via Server-Sent Events (SSE)
+*   **Secure Authentication**: Google OAuth 2.0 integration.
+*   **Deep Crawling**: Recursive traversal of complex folder hierarchies.
+*   **Real-Time Synchronization**: Uses Google Drive Webhooks (Push Notifications) instead of inefficient polling.
+*   **Smart Storage**: SHA-256 based content hashing to prevent duplicate file storage.
+*   **Data Normalization**: Unified metadata format for all file types (Docs, Sheets, PDFs, etc.).
+*   **Live Monitoring**: Server-Sent Events (SSE) for real-time activity tracking in the UI.
 
 ---
 
@@ -24,236 +23,142 @@ This project allows you to:
 Different-Connector-Pipeline/
 │
 ├── backend/
-│   ├── main.py              # FastAPI app (APIs + SSE)
-│   ├── auth.py              # Google OAuth logic
-│   ├── crawler.py           # Recursive Drive crawler
-│   ├── poller.py            # Polling scheduler (30 sec)
-│   ├── normalizer.py        # File normalization logic
-│   ├── storage.py           # Local file storage
-│   ├── events.py            # SSE event system
-│   ├── duplicate_check.py   # Duplicate tracking
-│   ├── config.py            # Configurations
-│   ├── requirements.txt     # Backend dependencies
-│   └── .env.example         # Environment variables template
+│   ├── main.py              # FastAPI application & API layer
+│   ├── auth.py              # Google OAuth 2.0 & Token management
+│   ├── crawler.py           # Core recursion & Hashing logic
+│   ├── webhook.py           # Google Drive Webhook handler & Registration
+│   ├── normalizer.py        # Metadata extraction & Standardization
+│   ├── storage.py           # Local persistence & Folder management
+│   ├── duplicate_check.py   # SHA-256 Deduplication & Lock management
+│   ├── events.py            # SSE (Server-Sent Events) broadcast system
+│   ├── config.py            # Environment configurations
+│   ├── Dockerfile           # Backend containerization
+│   └── requirements.txt     # Python dependencies
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx
 │   │   ├── components/
-│   │   │   ├── LoginPage.jsx
-│   │   │   ├── FolderPicker.jsx
-│   │   │   ├── Dashboard.jsx
-│   │   ├── index.css
-│   │   └── main.jsx
-│   │
-│   ├── index.html
-│   ├── package.json
+│   │   │   ├── LoginPage.jsx    # OAuth flow entry
+│   │   │   ├── FolderPicker.jsx # Google Drive directory browser
+│   │   │   ├── Dashboard.jsx    # Real-time activity feeds & File explorer
+│   │   ├── App.jsx
+│   │   └── index.css            # Modern UI styling
 │   └── vite.config.js
 │
-├── storage/                 # Ignored (generated files)
-├── README.md
-└── .gitignore
+├── docker-compose.yml       # Full system orchestration
+└── storage/                 # Data persistence layer (Local)
 ```
 
 ---
 
-## ⚙️ Features
+## ⚙️ Core Features
 
-### 🔐 Authentication
+### 🔐 Multi-Layer Security
+*   Google OAuth 2.0 protocol for secure delegated access.
+*   Scope-limited permissions (`drive.readonly`).
+*   Secure environment variable management.
 
-* Google OAuth 2.0 login
-* Secure token handling
+### 📂 Intelligent Crawling & Deduplication
+*   **Recursive Discovery**: Automatically finds every file in the selected root and its subfolders.
+*   **Google Native Export**: Automatically converts Google Docs/Sheets/Slides to standard formats (PDF, CSV, etc.) for local storage.
+*   **SHA-256 Hashing**: Generates unique fingerprints for every file. If a duplicate file is found (even with a different name), the system skips redundant storage and references the original.
 
-### 📂 Folder Crawling
+### 📡 Real-Time Webhook Engine
+*   **Push Notifications**: Registers a webhook channel with Google Drive API.
+*   **Background Processing**: Immediately acknowledges Google's ping and triggers a scan in a background task to keep the API responsive.
+*   **Auto-Renewal**: Built-in scheduler to automatically renew the webhook channel before it expires.
 
-* Recursive traversal of nested folders
-* Handles Google native files (Docs, Sheets, etc.)
-
-### 🔄 Polling System
-
-* Runs every **30 seconds**
-* Detects new or updated files
-* Can be **paused/resumed**
-
-### 📡 Real-Time Updates
-
-* Server-Sent Events (SSE)
-* Live activity feed in frontend
-
-### 📊 File Normalization
-
-Each file includes:
-
-* File name
-* File type (pdf, csv, gdoc, etc.)
-* File extension
-* Size (KB / MB / GB)
-* Owner email
-* Path
-* Last modified time
+### 📊 Modern Dashboard
+*   **SSE Activity Feed**: Watch files being found, processed, and stored in real-time.
+*   **File Exploration**: View all stored files with normalized metadata (Size, MimeType, Owner, Path).
+*   **Folder Navigation**: Browse your Google Drive directory structure directly within the app.
 
 ---
 
 ## 🧠 Tech Stack
 
 ### Backend
-
-* FastAPI
-* AsyncIO
-* APScheduler
-* Google Drive API
+*   **FastAPI**: Modern, high-performance web framework.
+*   **AsyncIO & Aiofiles**: Fully non-blocking I/O for high concurrency.
+*   **Httpx**: Modern HTTP client for Google API interactions.
+*   **APScheduler**: For webhook renewal background jobs.
 
 ### Frontend
-
-* React (Vite)
-* Fetch API
-* SSE (EventSource)
+*   **React (Vite)**: Lightning-fast frontend development.
+*   **EventSource (SSE)**: Native browser support for real-time streams.
+*   **Tailwind-like Vanilla CSS**: Clean, responsive design.
 
 ---
 
 ## 🔑 Environment Setup
 
-### 1. Backend `.env`
+### 1. Google Cloud Console
+*   Enable **Google Drive API**.
+*   Configure **OAuth Consent Screen**.
+*   Create **OAuth 2.0 Client IDs** (Web application).
+*   Add `http://localhost:8000/auth/callback` to Authorized Redirect URIs.
 
-Create file:
-
-```
-backend/.env
-```
-
-Add:
-
-```
-GOOGLE_CLIENT_ID=your_client_id
-GOOGLE_CLIENT_SECRET=your_client_secret
-REDIRECT_URI=http://localhost:8000/auth/callback
+### 2. Backend Config
+Create `backend/.env`:
+```env
+GOOGLE_CLIENT_ID=your_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_secret
+GOOGLE_REDIRECT_URI=http://localhost:8000/auth/callback
 FRONTEND_URL=http://localhost:5173
+STORAGE_DIR=./storage
+MAX_FILE_SIZE_MB=50
+
+# PUBLIC URL for Webhooks (Required for Google to reach you)
+# Use ngrok for local dev: ngrok http 8000
+WEBHOOK_URL=https://<your-id>.ngrok.io
 ```
 
 ---
 
-## ▶️ Running the Project
+## ▶️ Getting Started
 
----
+### 🐳 Using Docker (Recommended)
+```bash
+docker-compose up --build
+```
 
-### 🔧 Backend Setup
+### 🔧 Manual Setup
 
+#### Backend
 ```bash
 cd backend
-
-# Create virtual environment
 python -m venv venv
-
-# Activate
-# Windows
-venv\Scripts\activate
-
-# Mac/Linux
-source venv/bin/activate
-
-# Install dependencies
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-
-# Run server
 uvicorn main:app --reload --port 8000
 ```
 
-Backend runs on:
-
-```
-http://localhost:8000
-```
-
----
-
-### 💻 Frontend Setup
-
+#### Frontend
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Run frontend
 npm run dev
 ```
 
-Frontend runs on:
-
-```
-http://localhost:5173
-```
-
 ---
 
-## 🔄 Application Flow
+## 🧪 API Reference
 
-1. Open frontend
-2. Login using Google
-3. Select a folder
-4. Start crawling
-5. View files and activity updates
-6. Polling runs every 30 seconds
-7. New files automatically appear
-
----
-
-## 🧪 API Endpoints
-
-| Method | Endpoint           | Description        |
-| ------ | ------------------ | ------------------ |
-| GET    | `/api/health`      | Health check       |
-| GET    | `/api/status`      | App status         |
-| GET    | `/api/folders`     | List Drive folders |
-| POST   | `/api/start-crawl` | Start crawling     |
-| GET    | `/api/files`       | Get stored files   |
-| POST   | `/api/start-poll`  | Resume polling     |
-| POST   | `/api/stop-poll`   | Pause polling      |
-| GET    | `/api/events`      | SSE stream         |
-
----
-
-## ⚠️ Notes
-
-* `storage/` folder is ignored in Git
-* `.env` file should never be committed
-* Ensure Google OAuth redirect URI matches backend
-
----
-
-## 🤝 Collaboration Workflow
-
-* `main` branch → stable production code
-* Each developer works in separate branch:
-
-  ```
-  git checkout -b username/feature-name
-  ```
-* Push branch:
-
-  ```
-  git push -u origin username/feature-name
-  ```
-* Create Pull Request → Merge after testing
-
----
-
-## 🛠️ Future Improvements
-
-* Search and filter files
-* Pagination for large datasets
-* File preview support
-* Multi-user support
-* Cloud storage integration (S3, GCS)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| **GET** | `/api/status` | Current authentication and webhook status |
+| **GET** | `/api/folders` | Browse Google Drive folders |
+| **POST** | `/api/start-crawl` | Initialize root folder and start sync |
+| **GET** | `/api/files` | Retrieve all normalized stored files |
+| **GET** | `/api/events` | **SSE Stream** for real-time activity |
+| **POST** | `/api/webhook/drive`| Google Push Notification Receiver |
+| **POST** | `/api/webhook/register`| Manually re-register the webhook |
 
 ---
 
 ## 📄 License
-
-This project is for learning and development purposes.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ---
 
-## 👨‍💻 Author
 
-**Arpan Ghosh**
