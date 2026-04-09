@@ -3,7 +3,7 @@ import json
 import os
 import uuid
 import httpx
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from auth import load_credentials
@@ -190,14 +190,20 @@ def _schedule_renewal(expiration_ms: int):
     # If expiry is very soon, renew in 5 minutes instead
     now_ms = datetime.now(timezone.utc).timestamp() * 1000
     if renew_at_ms <= now_ms:
-        from apscheduler.triggers.interval import IntervalTrigger
+        # IMPORTANT: set next_run_time explicitly so the interval job does NOT
+        # fire immediately. Without this, APScheduler fires the job as soon as
+        # it is added, which causes _renewal_job → register_webhook →
+        # _schedule_renewal → new interval job → fires immediately → infinite loop.
+        next_run = datetime.now(timezone.utc) + timedelta(minutes=5)
         _renewal_scheduler.add_job(
             _renewal_job,
             'interval',
             minutes=5,
             id='webhook_renew',
             replace_existing=True,
+            next_run_time=next_run,
         )
+        print(f'[webhook] Expiry imminent — renewal scheduled in 5 min ({next_run.isoformat()})')
     else:
         _renewal_scheduler.add_job(
             _renewal_job,
@@ -206,6 +212,7 @@ def _schedule_renewal(expiration_ms: int):
             id='webhook_renew',
             replace_existing=True,
         )
+        print(f'[webhook] Renewal scheduled at {renew_dt.isoformat()}')
 
     if not _renewal_scheduler.running:
         _renewal_scheduler.start()
@@ -240,14 +247,21 @@ async def process_drive_notification(resource_state: str, channel_id: str, messa
 
     from events import broadcast
 
+    print(f'[webhook] ► Notification received: state={resource_state!r}  channel={channel_id!r}  msg={message_number}')
+
     # Handshake — just acknowledge, nothing to do
     if resource_state == 'sync':
+        print('[webhook]   Handshake — acknowledged, no action needed')
         return
 
-    # Verify it's our channel
+    # Verify it\'s our channel
     channel = load_channel()
-    if channel.get('channel_id') != channel_id:
+    stored_id = channel.get('channel_id')
+    if stored_id != channel_id:
+        print(f'[webhook]   Channel ID MISMATCH — stored={stored_id!r}, received={channel_id!r} — ignoring')
         return
+
+    print(f'[webhook]   Channel ID matched — proceeding with delta sync')
 
     if _processing:
         await broadcast({'type': 'webhook_received', 'message': 'Change detected — crawl already running, queued'})
@@ -255,22 +269,23 @@ async def process_drive_notification(resource_state: str, channel_id: str, messa
 
     _processing = True
     try:
-        from crawler import start_crawl, get_root_folder, is_crawling
+        from crawler import process_delta_changes, get_root_folder, is_crawling
 
         root = get_root_folder()
         if not root.get('id'):
+            print('[webhook]   No root folder set — ignoring')
             return
 
         await broadcast({
             'type': 'webhook_received',
-            'message': f'Drive change detected (msg #{message_number}) — scanning for new files…',
+            'message': f'Drive change detected (msg #{message_number}) — fetching delta…',
         })
 
         if is_crawling():
-            await broadcast({'type': 'webhook_received', 'message': 'Crawl already in progress, will pick up changes on completion'})
+            await broadcast({'type': 'webhook_received', 'message': 'Crawl already in progress — delta queued'})
             return
 
-        await start_crawl(root['id'], root.get('name', ''))
+        await process_delta_changes()
 
     finally:
         _processing = False

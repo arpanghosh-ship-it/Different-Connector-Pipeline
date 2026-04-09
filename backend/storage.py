@@ -92,3 +92,30 @@ def get_all_stored_files() -> list:
 
     results.sort(key=lambda item: (int(item.get('folder_number') or 10**12), item.get('file_name') or ''))
     return results
+
+
+async def update_normalized_json(folder_number: int, updated_fields: dict) -> bool:
+    """
+    Merges updated_fields into an existing normalized.json.
+    Used when a file moves folders, is renamed, deleted, or its metadata changes.
+    Returns True if successfully updated.
+    """
+    folder_path = os.path.join(STORAGE_DIR, str(folder_number))
+    json_path = os.path.join(folder_path, 'normalized.json')
+
+    if not os.path.exists(json_path):
+        return False
+
+    try:
+        async with aiofiles.open(json_path, 'r', encoding='utf-8') as f:
+            existing = json.loads(await f.read())
+
+        existing.update(updated_fields)
+
+        async with aiofiles.open(json_path, 'w', encoding='utf-8') as f:
+            await f.write(json.dumps(existing, indent=2))
+
+        return True
+    except Exception as e:
+        print(f'[storage] ERROR updating normalized.json #{folder_number}: {e}')
+        return False

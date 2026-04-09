@@ -197,6 +197,229 @@ async def _crawl_folder(folder_id: str, folder_name: str, parent_path: str, toke
             await asyncio.sleep(0.1)
 
 
+async def _get_full_path(folder_id: str, token: str, root_folder_id: str) -> str:
+    """
+    Walks up the Drive folder hierarchy from folder_id to root_folder_id
+    and builds the full path string, e.g. "Root Folder/training/subfolder".
+    """
+    parts = []
+    current_id = folder_id
+    visited_ids: set = set()
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        while current_id and current_id != root_folder_id:
+            if current_id in visited_ids:
+                break
+            visited_ids.add(current_id)
+
+            resp = await client.get(
+                f'{DRIVE_FILES_URL}/{current_id}',
+                params={'fields': 'id,name,parents', 'supportsAllDrives': 'true'},
+                headers={'Authorization': f'Bearer {token}'},
+            )
+            if resp.status_code != 200:
+                break
+
+            data = resp.json()
+            parts.append(data.get('name', ''))
+            parents = data.get('parents', [])
+            current_id = parents[0] if parents else None
+
+    root = get_root_folder()
+    root_name = root.get('name', 'Root')
+    parts.append(root_name)
+    parts.reverse()
+    return '/'.join(parts)
+
+
+async def process_delta_changes():
+    """
+    Fetches only the files that changed in Drive since the last saved page token.
+    Handles three cases:
+      - Deleted / trashed   → sets content_status = 'deleted' in normalized.json
+      - Known file changed  → updates path, parent, name, etc. in normalized.json
+      - New file            → triggers a targeted start_crawl() (dedup skips existing)
+    Saves the new page_token when done.
+    """
+    from datetime import datetime, timezone
+    from duplicate_check import get_visited_entry, mark_visited
+    from storage import update_normalized_json
+    from webhook import load_page_token, save_page_token
+
+    creds = load_credentials()
+    if not creds or not creds.token:
+        await broadcast({'type': 'error', 'message': 'Delta sync: not authenticated'})
+        return
+
+    token = creds.token
+    root = get_root_folder()
+    root_id = root.get('id')
+
+    page_token = load_page_token()
+    if not page_token:
+        await broadcast({
+            'type': 'error',
+            'message': 'Delta sync: no page token — re-select folder to reset',
+        })
+        return
+
+    changes_url = 'https://www.googleapis.com/drive/v3/changes'
+    all_changes = []
+    next_token = None
+
+    print(f'[delta] Starting delta sync. page_token={page_token!r}  root_id={root_id!r}')
+
+    # ── Fetch all change pages ─────────────────────────────────────────────────
+    async with httpx.AsyncClient(timeout=30) as client:
+        current_page_token = page_token
+        while True:
+            params = {
+                'pageToken': current_page_token,
+                'supportsAllDrives': 'true',
+                'includeItemsFromAllDrives': 'true',
+                # Explicitly list file subfields so Drive always returns them,
+                # even for shared-drive files where bare 'file' can be sparse.
+                'fields': (
+                    'nextPageToken,newStartPageToken,'
+                    'changes(type,removed,fileId,'
+                    'file(id,name,mimeType,parents,modifiedTime,'
+                    'owners(emailAddress),shared,size,webViewLink,trashed))'
+                ),
+            }
+            resp = await client.get(
+                changes_url,
+                params=params,
+                headers={'Authorization': f'Bearer {token}'},
+            )
+            if resp.status_code == 401:
+                await broadcast({'type': 'error', 'message': 'Delta sync: token expired'})
+                return
+
+            resp.raise_for_status()
+            data = resp.json()
+            all_changes.extend(data.get('changes', []))
+
+            # Capture the final new page token
+            next_token = data.get('newStartPageToken') or data.get('nextPageToken')
+
+            if 'nextPageToken' in data:
+                current_page_token = data['nextPageToken']
+            else:
+                break
+
+    print(f'[delta] API returned {len(all_changes)} change(s). next_token={next_token!r}')
+
+    # Save updated token so next delta starts from here
+    if next_token:
+        save_page_token(next_token)
+
+    if not all_changes:
+        print('[delta] No changes — silent success.')
+        return  # nothing changed — silent success
+
+    await broadcast({
+        'type': 'webhook_received',
+        'message': f'Delta sync: {len(all_changes)} change(s) detected — processing…',
+    })
+
+    new_files_to_crawl = []
+
+    for change in all_changes:
+        if change.get('type') != 'file':
+            continue
+
+        file_id = change.get('fileId')
+        removed = change.get('removed', False)
+        file_obj = change.get('file') or {}
+        trashed = file_obj.get('trashed', False)
+
+        print(f'[delta]   Change: file_id={file_id!r}  removed={removed}  trashed={trashed}  name={file_obj.get("name")!r}  parents={file_obj.get("parents")}')
+
+        # ── Case 1: File deleted / trashed ─────────────────────────────────────
+        if removed or trashed:
+            entry = await get_visited_entry(file_id)
+            if entry:
+                folder_num = entry['folder_number']
+                print(f'[delta]     → DELETED: folder #{folder_num}  path={entry.get("path")!r}')
+                await update_normalized_json(folder_num, {
+                    'content_status': 'deleted',
+                    'connector_synced_at': datetime.now(timezone.utc).isoformat(),
+                })
+                await broadcast({
+                    'type': 'stored',
+                    'path': entry.get('path', ''),
+                    'file_name': entry.get('file_name', ''),
+                    'folder_number': folder_num,
+                    'content_status': 'deleted',
+                    'mime_type': '',
+                })
+            else:
+                print(f'[delta]     → DELETED but not in visited — skipping')
+            continue
+
+        # ── Case 2: Already known file — update its metadata ───────────────────
+        entry = await get_visited_entry(file_id)
+        if entry:
+            print(f'[delta]     → KNOWN FILE: folder #{entry["folder_number"]}  rebuilding path…')
+            folder_num = entry['folder_number']
+            parent_id = (file_obj.get('parents') or [None])[0]
+            owner_email = None
+            if file_obj.get('owners'):
+                owner_email = file_obj['owners'][0].get('emailAddress')
+
+            # Rebuild full path from the new parent hierarchy
+            try:
+                if parent_id and root_id:
+                    parent_path = await _get_full_path(parent_id, token, root_id)
+                    full_path = f"{parent_path}/{file_obj.get('name', '')}"
+                else:
+                    full_path = entry.get('path', '')
+            except Exception:
+                full_path = entry.get('path', '')  # fallback to old path
+
+            updated_fields = {
+                'file_name': file_obj.get('name', ''),
+                'path': full_path,
+                'parent_folder_id': parent_id,
+                'modified_at': file_obj.get('modifiedTime'),
+                'shared': file_obj.get('shared', False),
+                'web_url': file_obj.get('webViewLink'),
+                'connector_synced_at': datetime.now(timezone.utc).isoformat(),
+            }
+            if owner_email:
+                updated_fields['owner_email'] = owner_email
+
+            ok = await update_normalized_json(folder_num, updated_fields)
+            if ok:
+                # Also sync visited.json with the new name/path
+                await mark_visited(file_id, folder_num, file_obj.get('name', ''), full_path)
+                await broadcast({
+                    'type': 'stored',
+                    'path': full_path,
+                    'file_name': file_obj.get('name', ''),
+                    'folder_number': folder_num,
+                    'content_status': 'updated',
+                    'mime_type': file_obj.get('mimeType', ''),
+                })
+            continue
+
+        # ── Case 3: New file — queue it for a targeted crawl ──────────────────
+        print(f'[delta]     → NEW FILE (not in visited): {file_obj.get("name")!r}')
+        if file_id:
+            new_files_to_crawl.append(file_obj)
+
+    # ── Process any genuinely new files ───────────────────────────────────────
+    if new_files_to_crawl and root_id:
+        await broadcast({
+            'type': 'webhook_received',
+            'message': f'{len(new_files_to_crawl)} new file(s) detected — scanning root folder…',
+        })
+        # Full crawl, but dedup (is_visited) ensures only truly new files are stored
+        await start_crawl(root_id, root.get('name', ''))
+
+    await broadcast({'type': 'crawl_complete'})
+
+
 async def start_crawl(folder_id: str, folder_name: str = ''):
     global _is_crawling
     if _is_crawling:

@@ -45,6 +45,12 @@ async def get_all_visited() -> dict:
     return await _load()
 
 
+async def get_visited_entry(source_id: str) -> dict | None:
+    """Returns the full visited entry (folder_number, file_name, path) for a source_id, or None if not found."""
+    data = await _load()
+    return data.get(source_id)
+
+
 async def total_visited() -> int:
     data = await _load()
     return len(data)
