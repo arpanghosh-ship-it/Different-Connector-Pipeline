@@ -1,164 +1,290 @@
-# 🚀 Drive Connector Pipeline
+# ☁️ Multi-Cloud Connector Pipeline
 
-A high-performance, full-stack application that connects to Google Drive, recursively crawls folders, normalizes data, and maintains a real-time synchronized dataset using Google Push Notifications (Webhooks) and Byte-level Deduplication.
-
----
-
-## 📌 Overview
-
-This project provides a complete pipeline for ingesting and monitoring Google Drive content:
-
-*   **Secure Authentication**: Google OAuth 2.0 integration.
-*   **Deep Crawling**: Recursive traversal of complex folder hierarchies.
-*   **Real-Time Synchronization**: Uses Google Drive Webhooks (Push Notifications) instead of inefficient polling.
-*   **Smart Storage**: SHA-256 based content hashing to prevent duplicate file storage.
-*   **Data Normalization**: Unified metadata format for all file types (Docs, Sheets, PDFs, etc.).
-*   **Live Monitoring**: Server-Sent Events (SSE) for real-time activity tracking in the UI.
+A high-performance full-stack application that synchronizes data from **Google Drive** and **Dropbox** in real time. It recursively crawls cloud directories, normalizes metadata, and maintains a synchronized local dataset using **webhooks** and **SHA-256 byte-level deduplication**.
 
 ---
 
-## 🏗️ Project Structure
+## 📋 Table of Contents
+
+- [Overview](#-overview)
+- [Features](#-features)
+- [Project Structure](#-project-structure)
+- [Prerequisites](#-prerequisites)
+- [Cloud Provider Setup](#-cloud-provider-setup)
+- [Local Development](#-local-development)
+- [Environment Variables](#-environment-variables)
+- [API Reference](#-api-reference)
+- [Known Limitations](#-known-limitations)
+- [Troubleshooting](#-troubleshooting)
+
+---
+
+## 🌐 Overview
+
+This project provides a unified pipeline for ingesting and monitoring content across multiple cloud providers:
+
+| Capability | Details |
+|---|---|
+| Cloud Providers | Google Drive, Dropbox |
+| Auth | OAuth 2.0 (both providers) |
+| Sync Strategy | Webhook-driven delta sync (cursor/token-based) |
+| Deduplication | SHA-256 content hashing |
+| Live Monitoring | Server-Sent Events (SSE) |
+| Frontend | React + Vite + TypeScript |
+| Backend | FastAPI (Python 3.11+) |
+
+---
+
+## ⚙️ Features
+
+### 🔐 Unified Authentication
+- **Google Drive** — OAuth via Google Cloud Console
+- **Dropbox** — OAuth via Dropbox Developer Console
+
+**Required Dropbox Scopes:**
+- `files.content.read`
+- `files.metadata.read`
+
+### 📡 Real-Time Delta Engines
+- **Google Drive** — `watch()` subscription model for push notifications
+- **Dropbox** — Challenge-response webhook verification
+- **Delta Sync** — Cursor/token-based syncing avoids full re-scans, reducing API cost and latency
+
+### 📁 Intelligent Storage
+- **Cross-cloud deduplication** — SHA-256 hashing prevents duplicate downloads across providers
+- **Robust sorting** — Tuple-based type-safe sorting handles mixed `int`/`str` values and prevents Python `TypeError`
+- **Unified metadata normalization** — Consistent schema regardless of provider
+
+---
+
+## 🗂️ Project Structure
 
 ```
-Different-Connector-Pipeline/
+Cloud-Connector-Pipeline/
 │
 ├── backend/
-│   ├── main.py              # FastAPI application & API layer
-│   ├── auth.py              # Google OAuth 2.0 & Token management
-│   ├── crawler.py           # Core recursion & Hashing logic
-│   ├── webhook.py           # Google Drive Webhook handler & Registration
-│   ├── normalizer.py        # Metadata extraction & Standardization
-│   ├── storage.py           # Local persistence & Folder management
-│   ├── duplicate_check.py   # SHA-256 Deduplication & Lock management
-│   ├── events.py            # SSE (Server-Sent Events) broadcast system
-│   ├── config.py            # Environment configurations
-│   ├── Dockerfile           # Backend containerization
-│   └── requirements.txt     # Python dependencies
+│   ├── main.py               # FastAPI app entry point
+│   ├── auth.py               # Google OAuth logic
+│   ├── dropbox_auth.py       # Dropbox OAuth logic
+│   ├── crawler.py            # Recursive directory traversal
+│   ├── webhook.py            # Webhook handlers (Google + Dropbox)
+│   ├── storage.py            # Deduplication & local storage
+│   ├── config.py             # Environment config loader
+│   └── requirements.txt
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── LoginPage.jsx    # OAuth flow entry
-│   │   │   ├── FolderPicker.jsx # Google Drive directory browser
-│   │   │   ├── Dashboard.jsx    # Real-time activity feeds & File explorer
-│   │   ├── App.jsx
-│   │   └── index.css            # Modern UI styling
-│   └── vite.config.js
+│   │   └── components/
+│   │       ├── LoginPage.jsx
+│   │       ├── FolderPicker.jsx
+│   │       └── Dashboard.jsx
+│   ├── vite.config.js
+│   └── package.json
 │
-├── docker-compose.yml       # Full system orchestration
-└── storage/                 # Data persistence layer (Local)
+└── storage/
+    └── <file_hash>/          # Deduplicated file store (Google Drive)
+    └── dropbox/              # Deduplicated file store (Dropbox)
 ```
 
 ---
 
-## ⚙️ Core Features
+## 🔑 Prerequisites
 
-### 🔐 Multi-Layer Security
-*   Google OAuth 2.0 protocol for secure delegated access.
-*   Scope-limited permissions (`drive.readonly`).
-*   Secure environment variable management.
+| Requirement | Version |
+|---|---|
+| Python | 3.11+ |
+| Node.js | 18+ |
+| ngrok | Latest |
+| (Windows only) `python-certifi-win32` | Latest |
 
-### 📂 Intelligent Crawling & Deduplication
-*   **Recursive Discovery**: Automatically finds every file in the selected root and its subfolders.
-*   **Google Native Export**: Automatically converts Google Docs/Sheets/Slides to standard formats (PDF, CSV, etc.) for local storage.
-*   **SHA-256 Hashing**: Generates unique fingerprints for every file. If a duplicate file is found (even with a different name), the system skips redundant storage and references the original.
-
-### 📡 Real-Time Webhook Engine
-*   **Push Notifications**: Registers a webhook channel with Google Drive API.
-*   **Background Processing**: Immediately acknowledges Google's ping and triggers a scan in a background task to keep the API responsive.
-*   **Auto-Renewal**: Built-in scheduler to automatically renew the webhook channel before it expires.
-
-### 📊 Modern Dashboard
-*   **SSE Activity Feed**: Watch files being found, processed, and stored in real-time.
-*   **File Exploration**: View all stored files with normalized metadata (Size, MimeType, Owner, Path).
-*   **Folder Navigation**: Browse your Google Drive directory structure directly within the app.
+> **Note:** ngrok is required to expose your local server for webhook testing. Your ngrok URL must remain active during development.
 
 ---
 
-## 🧠 Tech Stack
-
-### Backend
-*   **FastAPI**: Modern, high-performance web framework.
-*   **AsyncIO & Aiofiles**: Fully non-blocking I/O for high concurrency.
-*   **Httpx**: Modern HTTP client for Google API interactions.
-*   **APScheduler**: For webhook renewal background jobs.
-
-### Frontend
-*   **React (Vite)**: Lightning-fast frontend development.
-*   **EventSource (SSE)**: Native browser support for real-time streams.
-*   **Tailwind-like Vanilla CSS**: Clean, responsive design.
-
----
-
-## 🔑 Environment Setup
+## ☁️ Cloud Provider Setup
 
 ### 1. Google Cloud Console
-*   Enable **Google Drive API**.
-*   Configure **OAuth Consent Screen**.
-*   Create **OAuth 2.0 Client IDs** (Web application).
-*   Add `http://localhost:8000/auth/callback` to Authorized Redirect URIs.
 
-### 2. Backend Config
-Create `backend/.env`:
-```env
-GOOGLE_CLIENT_ID=your_id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your_secret
-GOOGLE_REDIRECT_URI=http://localhost:8000/auth/callback
-FRONTEND_URL=http://localhost:5173
-STORAGE_DIR=./storage
-MAX_FILE_SIZE_MB=50
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable the **Google Drive API**
+3. Configure the **OAuth consent screen**
+4. Create **Web Application** credentials
 
-# PUBLIC URL for Webhooks (Required for Google to reach you)
-# Use ngrok for local dev: ngrok http 8000
-WEBHOOK_URL=https://<your-id>.ngrok.io
+**Authorized Redirect URI:**
+```
+http://localhost:8000/auth/callback
 ```
 
 ---
 
-## ▶️ Getting Started
+### 2. Dropbox Developer Console
 
-### 🐳 Using Docker (Recommended)
-```bash
-docker-compose up --build
+1. Go to [Dropbox App Console](https://www.dropbox.com/developers/apps)
+2. Create a new app (Full Dropbox or App Folder scope)
+3. Add the following under **Redirect URIs:**
+
+```
+http://localhost:8000/dropbox/callback
+https://<your-ngrok-id>.ngrok-free.app/dropbox/callback
 ```
 
-### 🔧 Manual Setup
+4. Add the following under **Webhook URI:**
 
-#### Backend
+```
+https://<your-ngrok-id>.ngrok-free.app/api/webhook/dropbox
+```
+
+5. Enable these **Permissions:**
+   - `files.metadata.read`
+   - `files.content.read`
+
+---
+
+## 🚀 Local Development
+
+### Step 1 — Backend Setup
+
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Activate virtual environment
+source venv/bin/activate          # macOS/Linux
+venv\Scripts\activate             # Windows
+
 pip install -r requirements.txt
+```
+
+### Step 2 — Start ngrok
+
+```bash
+ngrok http 8000
+```
+
+Copy your ngrok forwarding URL (e.g., `https://abc123.ngrok-free.app`) — you'll need it in `.env` and your Dropbox console.
+
+### Step 3 — Configure Environment Variables
+
+Create a `.env` file inside `backend/`:
+
+```env
+# Google OAuth
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:8000/auth/callback
+
+# Dropbox OAuth
+DROPBOX_APP_KEY=your_dropbox_app_key
+DROPBOX_APP_SECRET=your_dropbox_app_secret
+DROPBOX_REDIRECT_URI=https://<your-ngrok-id>.ngrok-free.app/dropbox/callback
+
+# General
+WEBHOOK_URL=https://<your-ngrok-id>.ngrok-free.app
+FRONTEND_URL=http://localhost:5173
+```
+
+### Step 4 — Configure Vite Proxy
+
+Update `frontend/vite.config.js` to proxy API requests:
+
+```js
+export default defineConfig({
+  server: {
+    proxy: {
+      '/api':      'http://localhost:8000',
+      '/auth':     'http://localhost:8000',
+      '/dropbox':  'http://localhost:8000',
+    }
+  }
+})
+```
+
+### Step 5 — Run the Application
+
+**Backend:**
+```bash
 uvicorn main:app --reload --port 8000
 ```
 
-#### Frontend
+**Frontend** (in a separate terminal):
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
+The frontend will be available at `http://localhost:5173`.
+
 ---
 
 ## 🧪 API Reference
 
 | Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| **GET** | `/api/status` | Current authentication and webhook status |
-| **GET** | `/api/folders` | Browse Google Drive folders |
-| **POST** | `/api/start-crawl` | Initialize root folder and start sync |
-| **GET** | `/api/files` | Retrieve all normalized stored files |
-| **GET** | `/api/events` | **SSE Stream** for real-time activity |
-| **POST** | `/api/webhook/drive`| Google Push Notification Receiver |
-| **POST** | `/api/webhook/register`| Manually re-register the webhook |
+|---|---|---|
+| `GET` | `/auth/login` | Start Google Drive OAuth flow |
+| `GET` | `/auth/callback` | Google OAuth callback |
+| `GET` | `/dropbox/login` | Start Dropbox OAuth flow |
+| `GET` | `/dropbox/callback` | Dropbox OAuth callback |
+| `GET` | `/api/webhook/dropbox` | Dropbox webhook challenge verification |
+| `POST` | `/api/webhook/dropbox` | Receive Dropbox webhook events |
+| `GET` | `/api/events` | SSE stream for live sync monitoring |
+
+---
+
+## ⚠️ Known Limitations
+
+| Area | Limitation |
+|---|---|
+| Webhooks | Fail if ngrok session disconnects |
+| OAuth | Token refresh not implemented — manual re-auth required |
+| Rate Limits | Large sync jobs may hit provider API rate limits |
+| Deduplication | Hash-based only — renamed files with identical content are treated as duplicates |
+| Production | OAuth redirect URIs must be updated for deployed environments |
+
+---
+
+## 🛠️ Troubleshooting
+
+### SSL Certificate Errors (Windows only)
+
+```bash
+pip install python-certifi-win32
+```
+
+Restart your terminal after installation.
+
+---
+
+### Invalid Redirect URI
+
+Ensure your ngrok URL matches **exactly** in all three places:
+
+- `backend/.env` → `DROPBOX_REDIRECT_URI`
+- Dropbox Developer Console → Redirect URIs
+- Dropbox Developer Console → Webhook URI
+
+Even a trailing slash mismatch will cause auth failures.
+
+---
+
+### Sorting Crash (`TypeError`)
+
+Mixed-type sorting (e.g., `int` vs `str` keys) is handled via tuple-based comparison:
+
+```python
+items.sort(key=lambda x: (0, int(x)) if isinstance(x, int) else (1, str(x)))
+```
+
+---
+
+### Webhook Not Receiving Events
+
+1. Confirm ngrok is running and the tunnel is active
+2. Verify the webhook URL in the Dropbox console matches your current ngrok URL (ngrok URLs change on free tier restarts)
+3. Check that the `/api/webhook/dropbox` challenge-response endpoint returned `200` during initial verification
 
 ---
 
 ## 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
 
----
-
-
+This project is for internal/development use. Add your license here.

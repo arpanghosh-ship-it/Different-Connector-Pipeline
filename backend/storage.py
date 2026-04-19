@@ -66,11 +66,19 @@ async def save_file_pair(source_id: str, normalized: dict, raw_content: bytes, r
     return folder_number
 
 
+# def _folder_sort_key(entry):
+#     try:
+#         return int(entry.name)
+#     except ValueError:
+#         return entry.name
+
 def _folder_sort_key(entry):
     try:
-        return int(entry.name)
-    except ValueError:
-        return entry.name
+        # If the folder name is a number, return (0, integer_value)
+        return (0, int(entry.name))
+    except (ValueError, AttributeError):
+        # If it's a string (like 'dropbox'), return (1, "string_value")
+        return (1, str(entry.name))
 
 
 def get_all_stored_files() -> list:

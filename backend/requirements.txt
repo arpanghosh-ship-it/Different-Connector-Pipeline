@@ -9,3 +9,4 @@ apscheduler==3.10.4
 aiofiles==23.2.1
 python-dotenv==1.0.1
 pydantic==2.9.2
+python-certifi-win32
