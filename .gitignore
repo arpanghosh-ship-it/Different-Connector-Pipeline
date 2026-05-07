@@ -12,6 +12,23 @@ env/
 backend/.env
 .env
 
+
+
+# rag pipeline gitignore
+rag_pipeline/.env
+rag_pipeline/evaluation/.env
+
+# evaluation outputs
+rag_pipeline/evaluation/pipeline_results.json
+rag_pipeline/evaluation/test_results.json
+
+# reports
+rag_pipeline/evaluation/reports/
+
+# hr documents
+rag_pipeline/evaluation/hr_documents/
+
+
 # Node / frontend
 node_modules/
 frontend/node_modules/
@@ -25,6 +42,7 @@ backend/storage/
 *.sqlite3
 *.db
 chroma_db/
+
 
 # OS files
 .DS_Store

@@ -68,6 +68,8 @@ def build_dropbox_normalized(
     entry: dict,
     content_status: str,
     owner_email: str = '',
+    uploader_email: str = '',
+    shared_with: list = None
 ) -> dict:
     """
     Build normalized.json from a Dropbox files/list_folder entry.
@@ -89,39 +91,36 @@ def build_dropbox_normalized(
     source_id  = entry.get('id', '')
     size_bytes = entry.get('size')
 
-    # Dropbox uses client_modified as the user-visible modification time
+    sharing_info = entry.get('sharing_info', {})
     modified_at = entry.get('client_modified') or entry.get('server_modified')
-
     mime_type = _guess_mime(file_name)
-    ext       = os.path.splitext(file_name)[1].lower()
-
-    # Parent folder path = everything before the last "/" in path_display
     parent_path = path.rsplit('/', 1)[0] if '/' in path else ''
 
-    # Build a web URL from the path (opens Dropbox web UI)
-    web_url = f'https://www.dropbox.com/home{path}' if path else None
+    # Logic: It is shared if it has members OR inherits from a shared folder
+    is_shared = bool(shared_with) or 'parent_shared_folder_id' in sharing_info
 
     return {
-        'source_id':             source_id,
-        'source_type':           'dropbox',
-        'file_name':             file_name,
-        'mime_type':             mime_type,
-        'export_mime_type':      None,          # Dropbox has no native-format conversion
-        'file_extension':        ext,
-        'file_type':             _file_type_label(file_name, mime_type),
-        'size_bytes':            size_bytes,
-        'size_human':            _format_size(size_bytes),
-        'path':                  path,
-        'parent_folder_id':      parent_path,
-        'owner_email':           owner_email,
-        'web_url':               web_url,
-        'shared':                False,          # Sharing info requires a separate API call
-        'modified_at':           modified_at,
-        'content_status':        content_status,
-        'raw_file_path':         None,           # filled in by storage.save_file_pair
-        'folder_number':         None,           # filled in by storage.save_file_pair
-        'connector_synced_at':   datetime.now(timezone.utc).isoformat(),
-        # Dropbox extras (stored alongside standard fields for pipeline use)
-        'dropbox_content_hash':  entry.get('content_hash'),
-        'dropbox_rev':           entry.get('rev'),
+        'source_id':           source_id,
+        'source_type':         'dropbox',
+        'file_name':           file_name,
+        'mime_type':           mime_type,
+        'export_mime_type':    None,
+        'file_extension':      os.path.splitext(file_name)[1].lower(),
+        'file_type':           _file_type_label(file_name, mime_type),
+        'size_bytes':          size_bytes,
+        'size_human':          _format_size(size_bytes),
+        'path':                path,
+        'parent_folder_id':    parent_path,
+        'owner_email':         owner_email,
+        'uploader_email':      uploader_email,
+        'web_url':             f'https://www.dropbox.com/home{path}' if path else None,
+        'shared':              is_shared,
+        'shared_with':         shared_with or [],
+        'modified_at':         modified_at,
+        'content_status':      content_status,
+        'raw_file_path':       None,
+        'folder_number':       None,
+        'connector_synced_at': datetime.now(timezone.utc).isoformat(),
+        'dropbox_content_hash': entry.get('content_hash'),
+        'dropbox_rev':          entry.get('rev'),
     }

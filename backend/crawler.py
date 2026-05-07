@@ -11,6 +11,28 @@ from storage import save_file_pair
 from duplicate_check import is_visited, mark_visited, is_content_seen, mark_content_seen, get_original_folder 
 from events import broadcast
 from config import MAX_FILE_SIZE_BYTES, STORAGE_DIR, ROOT_FOLDER_FILE
+import logging
+
+def notify_rag_pipeline(folder_number: int) -> None:
+    """
+    Notify the RAG pipeline to ingest a newly synced folder.
+    This is fire-and-forget — connector never waits for RAG
+    to complete. If RAG pipeline is down, connector continues normally.
+    """
+    rag_url = os.getenv("RAG_PIPELINE_URL", "http://localhost:8001")
+    try:
+        # Fire and forget in a separate thread to not block async context
+        def _post():
+            try:
+                response = httpx.post(f"{rag_url}/ingest/{folder_number}", timeout=120)
+                logging.info(f"[RAG] Ingestion triggered for folder {folder_number} — status: {response.status_code}")
+            except Exception as e:
+                logging.error(f"[RAG] Pipeline notification failed for folder {folder_number}: {e}")
+        
+        asyncio.create_task(asyncio.to_thread(_post))
+    except Exception as e:
+        logging.error(f"[RAG] Failed to schedule notification for folder {folder_number}: {e}")
+
 
 _is_crawling = False
 _root_folder = {'id': None, 'name': None}
@@ -45,7 +67,7 @@ def is_crawling() -> bool:
 async def _list_items(folder_id: str, token: str) -> list:
     params = {
         'q': f"'{folder_id}' in parents and trashed=false",
-        'fields': 'files(id,name,mimeType,parents,modifiedTime,owners,shared,size,webViewLink,driveId),nextPageToken',
+        'fields': 'files(id,name,mimeType,parents,modifiedTime,owners,lastModifyingUser,permissions,shared,size,webViewLink,driveId),nextPageToken',
         'supportsAllDrives': 'true',
         'includeItemsFromAllDrives': 'true',
         'pageSize': '1000',
@@ -111,6 +133,9 @@ async def _process_file(file: dict, full_path: str, token: str):
     if file.get('owners'):
         owner_email = file['owners'][0].get('emailAddress')
 
+    uploader_metadata = file.get('lastModifyingUser', {})
+    shared_with_list = file.get('permissions', [])
+
     try:
         raw_bytes, raw_mime = await _fetch_content(file, token)
         content_status = 'accessible'
@@ -157,7 +182,7 @@ async def _process_file(file: dict, full_path: str, token: str):
         content_status = 'error'
         content_hash = None
 
-    normalized = build_normalized_document(file, full_path, content_status, owner_email)
+    normalized = build_normalized_document(file, full_path, content_status, owner_email, uploader_metadata, shared_with_list)
 
     folder_number = await save_file_pair(source_id, normalized, raw_bytes, raw_mime)
     
@@ -174,6 +199,10 @@ async def _process_file(file: dict, full_path: str, token: str):
         'content_status': content_status,
         'mime_type': file.get('mimeType', ''),
     })
+    
+    # Notify RAG pipeline for the newly stored file
+    if content_status == 'accessible':
+        notify_rag_pipeline(folder_number)
 
 
 async def _crawl_folder(folder_id: str, folder_name: str, parent_path: str, token: str):
@@ -283,7 +312,7 @@ async def process_delta_changes():
                     'nextPageToken,newStartPageToken,'
                     'changes(type,removed,fileId,'
                     'file(id,name,mimeType,parents,modifiedTime,'
-                    'owners(emailAddress),shared,size,webViewLink,trashed))'
+                    'owners(emailAddress),lastModifyingUser(emailAddress,displayName),permissions(emailAddress,displayName,role),shared,size,webViewLink,trashed))'
                 ),
             }
             resp = await client.get(
@@ -389,6 +418,23 @@ async def process_delta_changes():
             if owner_email:
                 updated_fields['owner_email'] = owner_email
 
+            uploader_metadata = file_obj.get('lastModifyingUser', {})
+            if uploader_metadata.get('emailAddress'):
+                updated_fields['uploader_email'] = uploader_metadata.get('emailAddress')
+            elif owner_email:
+                updated_fields['uploader_email'] = owner_email
+
+            if 'permissions' in file_obj:
+                shared_with = []
+                for perm in file_obj.get('permissions', []):
+                    if perm.get('emailAddress'):
+                        shared_with.append({
+                            "email": perm.get('emailAddress'),
+                            "name": perm.get('displayName', ''),
+                            "role": perm.get('role', '')
+                        })
+                updated_fields['shared_with'] = shared_with
+
             ok = await update_normalized_json(folder_num, updated_fields)
             if ok:
                 # Also sync visited.json with the new name/path
@@ -401,6 +447,9 @@ async def process_delta_changes():
                     'content_status': 'updated',
                     'mime_type': file_obj.get('mimeType', ''),
                 })
+                
+                # Notify RAG pipeline of the metadata update (so paths in Qdrant stay fresh)
+                notify_rag_pipeline(folder_num)
             continue
 
         # ── Case 3: New file — queue it for a targeted crawl ──────────────────

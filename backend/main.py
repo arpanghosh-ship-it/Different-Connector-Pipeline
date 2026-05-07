@@ -49,7 +49,14 @@ app = FastAPI(title='Connector Pipeline API — Drive + Dropbox', lifespan=lifes
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, 'http://localhost:5173', 'http://localhost:3000'],
+    allow_origins=[
+        FRONTEND_URL, 
+        'http://localhost:5173', 
+        'http://localhost:3000',
+        'https://handsewn-kelvin-reservedly.ngrok-free.dev' # ngrok backend url
+    ],
+    # This regex allows ANY ngrok tunnel to work, saving you future headaches
+    allow_origin_regex=r"https://.*\.ngrok-free\.dev",
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],

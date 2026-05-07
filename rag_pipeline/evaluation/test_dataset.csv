@@ -1,0 +1,11 @@
+query,grading_notes
+Who is the applicant for the UN Certificate No. 0003619/42942?,M/S. AL FALAAH PACKAGES
+What is the 'Valid Upto' date for the Indian Institute of Packaging certificate?,"April 9, 2015"
+What specific product is mentioned in the UN Certificate No. 0003619/42942?,Grapes
+What is the total quote amount in the sample quotation document?,615.65
+Who is the recipient (To:) of the sample quotation dated 2023-10-27?,John Doe
+What is the tax amount calculated in the quotation?,15.65 (based on a 2.61% tax rate)
+"According to Clause 4.1 of ISO/IEC 27001:2022, what must the organization determine?",External and internal issues that are relevant to its purpose and that affect its ability to achieve the intended outcome(s) of its information security management system.
+"In ISO 27001:2022, what does Clause 4.2 specifically address?",Understanding the needs and expectations of interested parties.
+What are the headers available in the customers-100.csv file?,"Index, Customer Id, First Name, Last Name, Company, City, Country, Phone 1, Phone 2, Email, Subscription Date, Website"
+What is the name of the 11th column in the customers-100.csv file?,Subscription Date
