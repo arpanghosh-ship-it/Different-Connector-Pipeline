@@ -3,10 +3,12 @@ import hashlib
 import hmac
 import json
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from auth import router as auth_router, load_credentials
 from crawler import start_crawl, set_root_folder, get_root_folder, list_drive_folders
@@ -21,6 +23,7 @@ from webhook import (
     stop_renewal_scheduler,
 )
 from config import FRONTEND_URL, DROPBOX_APP_SECRET
+from response import success_response, error_response
 
 # ── Dropbox imports ────────────────────────────────────────────────────────────
 from dropbox_auth import (
@@ -67,6 +70,23 @@ app.include_router(dropbox_auth_router)
 app.include_router(dropbox_webhook_router, prefix="/api/webhook/dropbox")
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return error_response(
+        message='Request validation failed',
+        data={'errors': exc.errors()},
+        status_code=422
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request, exc):
+    return error_response(
+        message=str(exc.detail),
+        status_code=exc.status_code
+    )
+
+
 # ── Request models ─────────────────────────────────────────────────────────────
 
 class StartCrawlRequest(BaseModel):
@@ -83,7 +103,10 @@ class DropboxStartCrawlRequest(BaseModel):
 
 @app.get('/api/health')
 def health():
-    return {'status': 'ok'}
+    return success_response(
+        message='Connector pipeline health check completed',
+        data={'status': 'ok'}
+    )
 
 
 @app.get('/api/status')
@@ -93,18 +116,21 @@ async def status():
     wh         = webhook_status()
     dbx_root   = get_dropbox_root()
 
-    return {
-        # Google Drive
-        'authenticated':      load_credentials() is not None,
-        'root_folder':        drive_root,
-        'webhook':            wh,
-        'total_files_stored': await total_visited(),
+    return success_response(
+        message='Connector status retrieved successfully',
+        data={
+            # Google Drive
+            'authenticated':      load_credentials() is not None,
+            'root_folder':        drive_root,
+            'webhook':            wh,
+            'total_files_stored': await total_visited(),
 
-        # Dropbox
-        'dropbox_authenticated': is_dropbox_authenticated(),
-        'dropbox_root_folder':   dbx_root,
-        'dropbox_crawling':      is_dropbox_crawling(),
-    }
+            # Dropbox
+            'dropbox_authenticated': is_dropbox_authenticated(),
+            'dropbox_root_folder':   dbx_root,
+            'dropbox_crawling':      is_dropbox_crawling(),
+        }
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -115,32 +141,47 @@ async def status():
 async def get_folders(parent_id: str = 'root'):
     creds = load_credentials()
     if not creds:
-        raise HTTPException(status_code=401, detail='Not authenticated')
+        return error_response(
+            message='Google Drive is not authenticated',
+            status_code=401
+        )
     folders = await list_drive_folders(parent_id)
-    return {'folders': folders}
+    return success_response(
+        message='Google Drive folder list retrieved successfully',
+        data={'folders': folders, 'count': len(folders)}
+    )
 
 
 @app.post('/api/start-crawl')
 async def trigger_crawl(body: StartCrawlRequest):
     creds = load_credentials()
     if not creds:
-        raise HTTPException(status_code=401, detail='Not authenticated')
+        return error_response(
+            message='Google Drive is not authenticated',
+            status_code=401
+        )
 
     set_root_folder(body.folder_id, body.folder_name)
     asyncio.create_task(start_crawl(body.folder_id, body.folder_name))
     wh_result = await register_webhook()
 
-    return {
-        'message':     'Crawl started',
-        'folder_id':   body.folder_id,
-        'folder_name': body.folder_name,
-        'webhook':     wh_result,
-    }
+    return success_response(
+        message='Google Drive folder crawl started',
+        data={
+            'folder_id':   body.folder_id,
+            'folder_name': body.folder_name,
+            'webhook':     wh_result,
+        }
+    )
 
 
 @app.get('/api/files')
 def list_files():
-    return {'files': get_all_stored_files()}
+    files = get_all_stored_files()
+    return success_response(
+        message='Stored file list retrieved successfully',
+        data={'files': files, 'count': len(files)}
+    )
 
 
 @app.post('/api/webhook/drive')
@@ -151,29 +192,50 @@ async def drive_webhook(request: Request):
     asyncio.create_task(
         process_drive_notification(resource_state, channel_id, message_number)
     )
-    return Response(status_code=200)
+    return success_response(
+        message='Drive webhook received and queued for processing',
+        data={
+            'resource_state': resource_state,
+            'channel_id': channel_id,
+            'message_number': message_number,
+        }
+    )
 
 
 @app.get('/api/webhook/status')
 def get_webhook_status():
-    return webhook_status()
+    return success_response(
+        message='Google Drive webhook status retrieved successfully',
+        data=webhook_status()
+    )
 
 
 @app.post('/api/webhook/register')
 async def manual_register_webhook():
     creds = load_credentials()
     if not creds:
-        raise HTTPException(status_code=401, detail='Not authenticated')
+        return error_response(
+            message='Google Drive is not authenticated',
+            status_code=401
+        )
     result = await register_webhook()
     if not result['success']:
-        raise HTTPException(status_code=400, detail=result['error'])
-    return result
+        return error_response(
+            message=result.get('error', 'Google Drive webhook registration failed'),
+            status_code=400
+        )
+    return success_response(
+        message='Google Drive webhook registered successfully',
+        data=result
+    )
 
 
 @app.post('/api/webhook/stop')
 async def manual_stop_webhook():
     await stop_webhook()
-    return {'message': 'Webhook stopped'}
+    return success_response(
+        message='Google Drive webhook stopped successfully'
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -189,9 +251,15 @@ async def get_dropbox_folders(path: str = ''):
     """
     token = await load_dropbox_token()
     if not token:
-        raise HTTPException(status_code=401, detail='Dropbox: not authenticated')
+        return error_response(
+            message='Dropbox is not authenticated',
+            status_code=401
+        )
     folders = await list_dropbox_folders(path)
-    return {'folders': folders}
+    return success_response(
+        message='Dropbox folder list retrieved successfully',
+        data={'folders': folders, 'count': len(folders)}
+    )
 
 
 @app.post('/api/dropbox/start-crawl')
@@ -199,20 +267,25 @@ async def trigger_dropbox_crawl(body: DropboxStartCrawlRequest):
     """Start full recursive Dropbox crawl on the selected folder path."""
     token = await load_dropbox_token()
     if not token:
-        raise HTTPException(status_code=401, detail='Dropbox: not authenticated')
+        return error_response(
+            message='Dropbox is not authenticated',
+            status_code=401
+        )
 
     set_dropbox_root(body.path, body.name or body.path.split('/')[-1])
     asyncio.create_task(start_dropbox_crawl(body.path, body.name))
 
-    return {
-        'message':      'Dropbox crawl started',
-        'path':         body.path,
-        'name':         body.name,
-        'webhook_note': (
-            'Dropbox webhooks are registered via the App Console. '
-            'Ensure your WEBHOOK_URL/api/webhook/dropbox is set there.'
-        ),
-    }
+    return success_response(
+        message='Dropbox folder crawl started',
+        data={
+            'path':         body.path,
+            'name':         body.name,
+            'webhook_note': (
+                'Dropbox webhooks are registered via the App Console. '
+                'Ensure your WEBHOOK_URL/api/webhook/dropbox is set there.'
+            ),
+        }
+    )
 
 
 @app.get('/api/dropbox/files')
@@ -221,11 +294,16 @@ def list_dropbox_files():
     Returns all stored files from BOTH Drive and Dropbox.
     Frontend can filter by source_type == 'dropbox'.
     """
-    return {'files': get_all_stored_files()}
+    files = get_all_stored_files()
+    return success_response(
+        message='Dropbox file sync status retrieved successfully',
+        data={'files': files, 'count': len(files)}
+    )
 
 
 # ── SSE stream (shared by both Drive and Dropbox) ─────────────────────────────
 
+# SSE streaming endpoint -- standard response envelope not applicable
 @app.get('/api/events')
 async def sse_stream(request: Request):
     queue = add_listener()

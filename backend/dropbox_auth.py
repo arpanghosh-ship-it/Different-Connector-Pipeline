@@ -9,10 +9,11 @@ Flow:
   4. GET /dropbox/logout          → delete saved credentials
 """
 import json
+import logging
 import os
 import secrets
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 
 from config import (
@@ -20,8 +21,10 @@ from config import (
     FRONTEND_URL, DROPBOX_CREDENTIALS_FILE, DROPBOX_STATES_FILE,
     DROPBOX_STORAGE_DIR,
 )
+from response import success_response, error_response
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 DROPBOX_AUTH_URL  = 'https://www.dropbox.com/oauth2/authorize'
 DROPBOX_TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token'
@@ -57,7 +60,7 @@ def _save_credentials(access_token: str, refresh_token: str, account_id: str):
             'refresh_token': refresh_token,
             'account_id':    account_id,
         }, f, indent=2)
-    print(f'[dropbox_auth] Credentials saved.')
+    logger.info('[dropbox_auth] Credentials saved.')
 
 
 def _load_raw_credentials() -> dict | None:
@@ -92,10 +95,10 @@ async def _refresh_access_token(refresh_token: str) -> str | None:
                 creds['access_token'] = new_token
                 with open(DROPBOX_CREDENTIALS_FILE, 'w', encoding='utf-8') as f:
                     json.dump(creds, f, indent=2)
-                print('[dropbox_auth] Access token refreshed.')
+                logger.info('[dropbox_auth] Access token refreshed.')
             return new_token
     except Exception as e:
-        print(f'[dropbox_auth] Token refresh failed: {e}')
+        logger.error(f'[dropbox_auth] Token refresh failed: {e}')
         return None
 
 
@@ -145,9 +148,9 @@ def is_dropbox_authenticated() -> bool:
 @router.get('/dropbox/login')
 def dropbox_login():
     if not DROPBOX_APP_KEY or not DROPBOX_APP_SECRET:
-        raise HTTPException(
+        return error_response(
+            message='DROPBOX_APP_KEY and DROPBOX_APP_SECRET must be set in .env',
             status_code=500,
-            detail='DROPBOX_APP_KEY and DROPBOX_APP_SECRET must be set in .env'
         )
 
     state = secrets.token_urlsafe(16)
@@ -163,13 +166,13 @@ def dropbox_login():
         f'&state={state}'
         f'&token_access_type=offline'
     )
-    print(f'[dropbox_auth] Login initiated. State saved: {state[:8]}…')
+    logger.info(f'[dropbox_auth] Login initiated. State saved: {state[:8]}...')
     return RedirectResponse(DROPBOX_AUTH_URL + params)
 
 
 @router.get('/dropbox/callback')
 async def dropbox_callback(code: str = None, state: str = None, error: str = None, error_description: str = None):
-    print(f'[dropbox_auth] Callback. state={state[:8] if state else None} error={error}')
+    logger.info(f'[dropbox_auth] Callback. state={state[:8] if state else None} error={error}')
 
     if error:
         return RedirectResponse(f'{FRONTEND_URL}?auth=error&connector=dropbox&reason={error}')
@@ -204,10 +207,10 @@ async def dropbox_callback(code: str = None, state: str = None, error: str = Non
             return RedirectResponse(f'{FRONTEND_URL}?auth=error&connector=dropbox&reason=no_access_token')
 
         _save_credentials(access_token, refresh_token, account_id)
-        print('[dropbox_auth] Token exchange OK → redirecting to frontend.')
+        logger.info('[dropbox_auth] Token exchange OK -- redirecting to frontend.')
 
     except Exception as e:
-        print(f'[dropbox_auth] Token exchange failed: {e}')
+        logger.error(f'[dropbox_auth] Token exchange failed: {e}')
         return RedirectResponse(f'{FRONTEND_URL}?auth=error&connector=dropbox&reason=token_exchange_failed')
 
     return RedirectResponse(f'{FRONTEND_URL}?auth=success&connector=dropbox')
@@ -219,15 +222,20 @@ def dropbox_logout():
         os.remove(DROPBOX_CREDENTIALS_FILE)
     if os.path.exists(DROPBOX_STATES_FILE):
         os.remove(DROPBOX_STATES_FILE)
-    print('[dropbox_auth] Logged out.')
-    return {'message': 'Dropbox logged out'}
+    logger.info('[dropbox_auth] Logged out.')
+    return success_response(
+        message='Dropbox logout completed'
+    )
 
 
 @router.get('/dropbox/me')
 async def dropbox_me():
     token = await load_dropbox_token()
     if not token:
-        raise HTTPException(status_code=401, detail='Dropbox: not authenticated')
+        return error_response(
+            message='Dropbox is not authenticated',
+            status_code=401
+        )
 
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.post(
@@ -239,12 +247,18 @@ async def dropbox_me():
             content=b'null',
         )
         if resp.status_code != 200:
-            raise HTTPException(status_code=401, detail='Dropbox token invalid')
+            return error_response(
+                message='Dropbox token is invalid',
+                status_code=401
+            )
 
         data = resp.json()
-        return {
+        return success_response(
+            message='Dropbox user profile retrieved successfully',
+            data={
             'name':     data.get('name', {}).get('display_name', ''),
             'email':    data.get('email', ''),
             'picture':  None,
             'provider': 'dropbox',
-        }
+            }
+        )

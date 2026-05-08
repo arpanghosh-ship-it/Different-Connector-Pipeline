@@ -20,16 +20,20 @@ import asyncio
 import hashlib
 import hmac
 import json
-from fastapi import APIRouter, Request, Response, Query
+import logging
+from fastapi import APIRouter, Request, Query
 from fastapi.responses import PlainTextResponse
 
 from events import broadcast
 from config import DROPBOX_APP_SECRET
+from response import success_response, error_response
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _processing = False
 
+# Plain-text verification endpoint -- standard response envelope not applicable
 @router.get("")
 async def dropbox_webhook_verify(challenge: str = Query(...)):
     """
@@ -37,7 +41,7 @@ async def dropbox_webhook_verify(challenge: str = Query(...)):
     Dropbox sends GET /api/webhook/dropbox?challenge=RANDOM_STRING
     We must respond with the challenge value as plain text.
     """
-    print(f'[dropbox_webhook] Verification challenge received: {challenge[:20]}…')
+    logger.info(f'[dropbox_webhook] Verification challenge received: {challenge[:20]}...')
     return PlainTextResponse(content=challenge)
 
 @router.post("")
@@ -54,14 +58,17 @@ async def dropbox_webhook_notify(request: Request):
     except Exception:
         account_ids = []
 
-    print(f'[dropbox_webhook] Notification received. accounts={account_ids}')
+    logger.info(f'[dropbox_webhook] Notification received. accounts={account_ids}')
 
     asyncio.create_task(
         process_dropbox_notification(account_ids, raw_body, signature)
     )
 
     # Must return 200 quickly — Dropbox will retry if we don't
-    return Response(status_code=200)
+    return success_response(
+        message='Dropbox webhook received and queued for processing',
+        data={'accounts': account_ids, 'count': len(account_ids)}
+    )
 
 
 async def process_dropbox_notification(account_ids: list, raw_body: bytes, signature: str):
@@ -83,10 +90,10 @@ async def process_dropbox_notification(account_ids: list, raw_body: bytes, signa
             hashlib.sha256,
         ).hexdigest()
         if not hmac.compare_digest(expected, signature):
-            print('[dropbox_webhook] SIGNATURE MISMATCH — ignoring notification')
+            logger.warning('[dropbox_webhook] SIGNATURE MISMATCH -- ignoring notification')
             return
     else:
-        print('[dropbox_webhook] WARNING: Signature verification skipped (no APP_SECRET or header)')
+        logger.warning('[dropbox_webhook] Signature verification skipped (no APP_SECRET or header)')
 
     if not account_ids:
         return

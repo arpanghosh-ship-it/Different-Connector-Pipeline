@@ -4,16 +4,26 @@ main.py — Application entrypoint for the standalone RAG pipeline.
 
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+RAG_SITE_PACKAGES = BASE_DIR / ".venv" / "Lib" / "site-packages"
+if RAG_SITE_PACKAGES.exists() and str(RAG_SITE_PACKAGES) not in sys.path:
+    sys.path.insert(0, str(RAG_SITE_PACKAGES))
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from openai import OpenAI
 from qdrant_client import QdrantClient
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import uvicorn
 
 from store.qdrant_store import init_collection
 from api_routes import router
+from utils.response import error_response
 
 # Configure logging at module level
 logging.basicConfig(
@@ -26,7 +36,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 1. Load environment variables
-    load_dotenv()
+    load_dotenv(BASE_DIR / ".env")
     
     # 2. Initialize OpenAI client once
     openai_key = os.getenv("OPENAI_API_KEY")
@@ -59,6 +69,23 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(router, prefix="")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return error_response(
+        message="Request validation failed",
+        data={"errors": exc.errors()},
+        status_code=422
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request, exc):
+    return error_response(
+        message=str(exc.detail),
+        status_code=exc.status_code
+    )
 
 
 if __name__ == "__main__":
