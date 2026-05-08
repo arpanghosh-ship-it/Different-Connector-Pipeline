@@ -1,8 +1,9 @@
 import json
+import logging
 import os
 import secrets
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -11,8 +12,10 @@ from config import (
     GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI,
     FRONTEND_URL, SCOPES, CREDENTIALS_FILE, STORAGE_DIR
 )
+from response import success_response, error_response
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # ── File-based state store (survives reloads & multiple processes) ──
 STATES_FILE = os.path.join(STORAGE_DIR, 'pending_states.json')
@@ -53,7 +56,7 @@ def _make_flow() -> Flow:
 
 def load_credentials() -> Credentials | None:
     if not os.path.exists(CREDENTIALS_FILE):
-        print(f"[auth] No credentials file found at: {CREDENTIALS_FILE}")
+        logger.info(f"[auth] No credentials file found at: {CREDENTIALS_FILE}")
         return None
     try:
         with open(CREDENTIALS_FILE, 'r', encoding='utf-8') as f:
@@ -67,13 +70,13 @@ def load_credentials() -> Credentials | None:
             scopes=SCOPES,
         )
         if creds.expired and creds.refresh_token:
-            print("[auth] Token expired — refreshing...")
+            logger.info("[auth] Token expired -- refreshing...")
             creds.refresh(GoogleRequest())
             _save_credentials(creds)
-        print(f"[auth] Credentials loaded OK. Token valid: {not creds.expired}")
+        logger.info(f"[auth] Credentials loaded OK. Token valid: {not creds.expired}")
         return creds
     except Exception as e:
-        print(f"[auth] ERROR loading credentials: {e}")
+        logger.error(f"[auth] ERROR loading credentials: {e}")
         return None
 
 
@@ -85,15 +88,15 @@ def _save_credentials(creds: Credentials):
             'refresh_token': creds.refresh_token,
             'expiry': creds.expiry.isoformat() if creds.expiry else None,
         }, f)
-    print(f"[auth] Credentials saved to {CREDENTIALS_FILE}")
+    logger.info(f"[auth] Credentials saved to {CREDENTIALS_FILE}")
 
 
 @router.get('/auth/login')
 def login():
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        raise HTTPException(
+        return error_response(
+            message='GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in .env',
             status_code=500,
-            detail='GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in .env'
         )
     flow = _make_flow()
     state = secrets.token_urlsafe(16)
@@ -102,7 +105,7 @@ def login():
     states = _load_states()
     states[state] = True
     _save_states(states)
-    print(f"[auth] Login initiated. State saved: {state[:8]}...")
+    logger.info(f"[auth] Login initiated. State saved: {state[:8]}...")
 
     auth_url, _ = flow.authorization_url(
         access_type='offline',
@@ -115,15 +118,15 @@ def login():
 
 @router.get('/auth/callback')
 def callback(code: str = None, state: str = None, error: str = None):
-    print(f"[auth] Callback received. state={state[:8] if state else None}... error={error}")
+    logger.info(f"[auth] Callback received. state={state[:8] if state else None}... error={error}")
 
     if error:
-        print(f"[auth] OAuth error: {error}")
+        logger.error(f"[auth] OAuth error: {error}")
         return RedirectResponse(f'{FRONTEND_URL}?auth=error&reason={error}')
 
     states = _load_states()
     if not state or state not in states:
-        print(f"[auth] Invalid state! Known states: {list(states.keys())[:3]}")
+        logger.warning(f"[auth] Invalid state! Known states: {list(states.keys())[:3]}")
         return RedirectResponse(f'{FRONTEND_URL}?auth=error&reason=invalid_state')
 
     del states[state]
@@ -134,9 +137,9 @@ def callback(code: str = None, state: str = None, error: str = None):
         flow.fetch_token(code=code)
         creds = flow.credentials
         _save_credentials(creds)
-        print("[auth] Token exchange successful. Redirecting to frontend.")
+        logger.info("[auth] Token exchange successful. Redirecting to frontend.")
     except Exception as e:
-        print(f"[auth] Token exchange failed: {e}")
+        logger.error(f"[auth] Token exchange failed: {e}")
         return RedirectResponse(f'{FRONTEND_URL}?auth=error&reason=token_exchange_failed')
 
     return RedirectResponse(f'{FRONTEND_URL}?auth=success')
@@ -148,15 +151,20 @@ def logout():
         os.remove(CREDENTIALS_FILE)
     if os.path.exists(STATES_FILE):
         os.remove(STATES_FILE)
-    print("[auth] Logged out — credentials deleted.")
-    return {'message': 'Logged out'}
+    logger.info("[auth] Logged out -- credentials deleted.")
+    return success_response(
+        message='Google Drive logout completed'
+    )
 
 
 @router.get('/auth/me')
 async def me():
     creds = load_credentials()
     if not creds or not creds.token:
-        raise HTTPException(status_code=401, detail='Not authenticated')
+        return error_response(
+            message='Google Drive is not authenticated',
+            status_code=401
+        )
 
     async with httpx.AsyncClient() as client:
         resp = await client.get(
@@ -164,5 +172,11 @@ async def me():
             headers={'Authorization': f'Bearer {creds.token}'},
         )
         if resp.status_code != 200:
-            raise HTTPException(status_code=401, detail='Token invalid')
-        return resp.json()
+            return error_response(
+                message='Google Drive token is invalid',
+                status_code=401
+            )
+        return success_response(
+            message='Google Drive user profile retrieved successfully',
+            data=resp.json()
+        )

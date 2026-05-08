@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 GOOGLE_NATIVE_EXPORT_MAP = {
     'application/vnd.google-apps.document': ('text/plain', '.txt'),
@@ -60,11 +61,27 @@ def format_size(size_bytes) -> str:
     return f'{size_bytes / (1024 ** 3):.2f} GB'
 
 
-def build_normalized_document(file: dict, path: str, content_status: str, owner_email: str = None) -> dict:
+def build_normalized_document(file: dict, path: str, content_status: str, owner_email: str = None, uploader_metadata: dict = None, shared_with_list: list = None) -> dict:
     export_mime, _ = get_export_mime(file.get('mimeType', ''))
     file_name = file.get('name', '')
     mime_type = file.get('mimeType', '')
     size_bytes = int(file.get('size', 0)) if file.get('size') else None
+
+    uploader_email = None
+    if uploader_metadata and uploader_metadata.get('emailAddress'):
+        uploader_email = uploader_metadata.get('emailAddress')
+    elif file.get('owners', [{}])[0].get('emailAddress'):
+        uploader_email = file.get('owners', [{}])[0].get('emailAddress')
+
+    shared_with = []
+    if shared_with_list:
+        for perm in shared_with_list:
+            if perm.get('emailAddress'):
+                shared_with.append({
+                    "email": perm.get('emailAddress'),
+                    "name": perm.get('displayName', ''),
+                    "role": perm.get('role', '')
+                })
 
     return {
         'source_id': file['id'],
@@ -77,10 +94,13 @@ def build_normalized_document(file: dict, path: str, content_status: str, owner_
         'size_bytes': size_bytes,
         'size_human': format_size(size_bytes),
         'path': path,
-        'parent_folder_id': (file.get('parents') or [None])[0],
+        'parent_folder_id': str(Path(path).parent).replace('\\', '/') if path else None,
+        'drive_folder_id': (file.get('parents') or [None])[0],
         'owner_email': owner_email or (
             file.get('owners', [{}])[0].get('emailAddress') if file.get('owners') else None
         ),
+        'uploader_email': uploader_email,
+        'shared_with': shared_with,
         'web_url': file.get('webViewLink'),
         'shared': file.get('shared', False),
         'modified_at': file.get('modifiedTime'),

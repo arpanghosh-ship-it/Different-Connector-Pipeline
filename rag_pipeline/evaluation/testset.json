@@ -1,0 +1,442 @@
+{
+  "generated_at": "2026-05-07T04:50:12.582837+00:00",
+  "total_questions": 70,
+  "source_pdfs": [
+    "1.pdf",
+    "10.pdf",
+    "11.pdf",
+    "12.pdf",
+    "13.pdf",
+    "14.pdf",
+    "2.pdf",
+    "3.pdf",
+    "4.pdf",
+    "5.pdf",
+    "6.pdf",
+    "7.pdf",
+    "8.pdf",
+    "9.pdf"
+  ],
+  "questions": [
+    {
+      "user_input": "What is the main purpose of the Code of Conduct?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "1.pdf"
+    },
+    {
+      "user_input": "Who does the Code of Conduct apply to?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "1.pdf"
+    },
+    {
+      "user_input": "What should an employee do when the proper course of action is unclear?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "1.pdf"
+    },
+    {
+      "user_input": "What can happen if an employee fails to comply with the business ethics and conduct standard?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "1.pdf"
+    },
+    {
+      "user_input": "What does the policy say about regulatory compliance across all territories?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "1.pdf"
+    },
+    {
+      "user_input": "What is compensatory off used for?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "2.pdf"
+    },
+    {
+      "user_input": "Who is eligible to claim compensatory off?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "2.pdf"
+    },
+    {
+      "user_input": "What approvals are required before taking compensatory off?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "2.pdf"
+    },
+    {
+      "user_input": "Can compensatory off be carried forward, and if so, under what conditions?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "2.pdf"
+    },
+    {
+      "user_input": "What happens if compensatory off is not availed within the allowed period?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "2.pdf"
+    },
+    {
+      "user_input": "What is the purpose of the dress code policy?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "3.pdf"
+    },
+    {
+      "user_input": "What standards of appearance or attire are employees expected to follow?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "3.pdf"
+    },
+    {
+      "user_input": "Are there different dress expectations for different roles or work situations?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "3.pdf"
+    },
+    {
+      "user_input": "What should an employee do if their attire does not meet the policy requirement?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "3.pdf"
+    },
+    {
+      "user_input": "What is the likely consequence of repeated dress code violations?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "3.pdf"
+    },
+    {
+      "user_input": "Who can refer candidates under the employee referral plan?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "4.pdf"
+    },
+    {
+      "user_input": "What makes a referred candidate eligible for the referral reward?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "4.pdf"
+    },
+    {
+      "user_input": "When is the referral reward payable?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "4.pdf"
+    },
+    {
+      "user_input": "Are there any cases where a referral reward will not be paid?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "4.pdf"
+    },
+    {
+      "user_input": "What steps must an employee follow to submit a valid referral?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "4.pdf"
+    },
+    {
+      "user_input": "What should an employee do immediately after losing an ID card?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "5.pdf"
+    },
+    {
+      "user_input": "Who must be notified when an ID card is lost?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "5.pdf"
+    },
+    {
+      "user_input": "Are any deductions or charges applied for a lost ID card?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "5.pdf"
+    },
+    {
+      "user_input": "How is a replacement ID card issued?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "5.pdf"
+    },
+    {
+      "user_input": "What is the employee's responsibility if the ID card is lost more than once?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "5.pdf"
+    },
+    {
+      "user_input": "What types of leave are covered under the leave policy?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "6.pdf"
+    },
+    {
+      "user_input": "Which leave term was renamed to privilege leave?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "6.pdf"
+    },
+    {
+      "user_input": "How does the leave policy apply during probation?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "6.pdf"
+    },
+    {
+      "user_input": "Who approves leave requests?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "6.pdf"
+    },
+    {
+      "user_input": "Can leave be carried forward or rejected under certain conditions?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "6.pdf"
+    },
+    {
+      "user_input": "What is the procedure for handing over a locker key?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "7.pdf"
+    },
+    {
+      "user_input": "What should an employee do if a locker key is lost?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "7.pdf"
+    },
+    {
+      "user_input": "Who is responsible for replacing or reporting a lost locker key?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "7.pdf"
+    },
+    {
+      "user_input": "Are there any charges or deductions for a lost key?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "7.pdf"
+    },
+    {
+      "user_input": "What happens to the locker key when an employee leaves the organization?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "7.pdf"
+    },
+    {
+      "user_input": "What is the procedure for handing over a locker key?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "8.pdf"
+    },
+    {
+      "user_input": "What should an employee do if a locker key is misplaced or damaged?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "8.pdf"
+    },
+    {
+      "user_input": "Who must be informed when a locker key cannot be returned?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "8.pdf"
+    },
+    {
+      "user_input": "Are there any penalties for losing a locker key?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "8.pdf"
+    },
+    {
+      "user_input": "What records should be maintained for locker key handover?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "8.pdf"
+    },
+    {
+      "user_input": "What are the official office working hours?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "9.pdf"
+    },
+    {
+      "user_input": "How is late coming treated under the office working hour policy?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "9.pdf"
+    },
+    {
+      "user_input": "Are employees allowed to take breaks freely, or are breaks regulated?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "9.pdf"
+    },
+    {
+      "user_input": "Does the policy mention overtime or extra working hours?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "9.pdf"
+    },
+    {
+      "user_input": "What is expected from employees regarding attendance and punctuality?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "9.pdf"
+    },
+    {
+      "user_input": "What behavior does the POSH policy prohibit?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "10.pdf"
+    },
+    {
+      "user_input": "Who can file a complaint under the POSH policy?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "10.pdf"
+    },
+    {
+      "user_input": "What is the role of the Internal Complaints Committee?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "10.pdf"
+    },
+    {
+      "user_input": "How is confidentiality maintained during a POSH complaint process?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "10.pdf"
+    },
+    {
+      "user_input": "What protection is given against retaliation or victimization?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "10.pdf"
+    },
+    {
+      "user_input": "Who is eligible for certification or coaching fee reimbursement?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "11.pdf"
+    },
+    {
+      "user_input": "What kinds of certification or coaching expenses are covered?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "11.pdf"
+    },
+    {
+      "user_input": "What documents are required to claim reimbursement?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "11.pdf"
+    },
+    {
+      "user_input": "Is there any approval required before enrolling in the course?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "11.pdf"
+    },
+    {
+      "user_input": "Are there conditions under which reimbursement may be denied or recovered?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "11.pdf"
+    },
+    {
+      "user_input": "What is the purpose of the rewards and recognitions policy?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "12.pdf"
+    },
+    {
+      "user_input": "What types of rewards or recognition are available?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "12.pdf"
+    },
+    {
+      "user_input": "Who can nominate an employee for recognition?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "12.pdf"
+    },
+    {
+      "user_input": "What criteria are used to decide recognition or awards?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "12.pdf"
+    },
+    {
+      "user_input": "How are reward decisions approved or announced?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "12.pdf"
+    },
+    {
+      "user_input": "What information must not be shared on social media under this policy?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "13.pdf"
+    },
+    {
+      "user_input": "How does the policy define client confidentiality on social media?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "13.pdf"
+    },
+    {
+      "user_input": "Do employees need approval before posting work-related content?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "13.pdf"
+    },
+    {
+      "user_input": "What should an employee do if they see a possible social media confidentiality breach?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "13.pdf"
+    },
+    {
+      "user_input": "What are the consequences of violating the social media confidentiality policy?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "13.pdf"
+    },
+    {
+      "user_input": "Who is eligible to work from home under the policy?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "14.pdf"
+    },
+    {
+      "user_input": "What approvals are needed before working from home?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "14.pdf"
+    },
+    {
+      "user_input": "What attendance or availability rules apply during work from home?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "14.pdf"
+    },
+    {
+      "user_input": "Are there security or equipment requirements for remote work?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "14.pdf"
+    },
+    {
+      "user_input": "Under what conditions can work from home be revoked or denied?",
+      "reference": "",
+      "reference_contexts": [],
+      "synthesizer_name": "14.pdf"
+    }
+  ]
+}
